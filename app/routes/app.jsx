@@ -16,12 +16,32 @@ export const loader = async ({ request }) => {
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
+// Polaris renders its own internal navigation (Page backAction, Breadcrumbs,
+// etc.) as a plain <a> unless told otherwise. Inside the embedded iframe a
+// hard anchor navigation drops the host/session query params App Bridge
+// relies on and can leave the frame blank — routing it through React
+// Router's Link keeps it a client-side SPA navigation instead.
+function PolarisLink({ url, external, target, children, ...rest }) {
+  if (external) {
+    return (
+      <a href={url} target={target ?? "_blank"} rel="noopener noreferrer" {...rest}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link to={url} target={target} {...rest}>
+      {children}
+    </Link>
+  );
+}
+
 export default function App() {
   const { apiKey } = useLoaderData();
 
   return (
     <AppProvider embedded apiKey={apiKey}>
-      <PolarisAppProvider i18n={polarisTranslations}>
+      <PolarisAppProvider i18n={polarisTranslations} linkComponent={PolarisLink}>
         <NavMenu>
           <Link to="/app" rel="home">
             Home

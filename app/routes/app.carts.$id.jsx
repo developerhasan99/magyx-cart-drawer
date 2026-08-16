@@ -8,9 +8,9 @@ import {
   BlockStack,
   Text,
   Badge,
-  Button,
   ActionList,
   Icon,
+  Select,
   TextField,
 } from "@shopify/polaris";
 import {
@@ -156,15 +156,17 @@ export const action = async ({ request, params }) => {
       name: String(formData.get("name") ?? ""),
       settings: JSON.parse(String(formData.get("settings") ?? "{}")),
     });
+    // Status rides along with the same Save action — see CartEditor: a
+    // single global Save button owns every pending change, publish state
+    // included, rather than the sidebar's status control writing straight
+    // to the database on its own.
+    const status = String(formData.get("status") ?? "DRAFT");
+    if (status === "PUBLISHED") {
+      await publishCartConfig(session.shop, params.id);
+    } else {
+      await unpublishCartConfig(session.shop, params.id);
+    }
     return { done: "save" };
-  }
-  if (intent === "publish") {
-    await publishCartConfig(session.shop, params.id);
-    return { done: "publish" };
-  }
-  if (intent === "unpublish") {
-    await unpublishCartConfig(session.shop, params.id);
-    return { done: "unpublish" };
   }
   if (intent === "delete") {
     await deleteCartConfig(session.shop, params.id);
@@ -239,20 +241,30 @@ function buildPreviewDoc(drawerCss, drawerJs) {
 export default function CartEditor() {
   const { cart, drawerCss, drawerJs, previewProducts } = useLoaderData();
   const fetcher = useFetcher();
-  const statusFetcher = useFetcher();
+  const deleteFetcher = useFetcher();
   const navigate = useNavigate();
   const shopify = useAppBridge();
 
   const [name, setName] = useState(cart.name);
   const [settings, setSettings] = useState(cart.settings);
+  const [status, setStatus] = useState(cart.status);
   const [activeSection, setActiveSection] = useState("general");
   const [previewOpen, setPreviewOpen] = useState(true);
   const iframeRef = useRef(null);
 
-  const savedRef = useRef({ name: cart.name, settings: cart.settings });
+  // The last-saved baseline, used to detect unsaved changes. This is real
+  // state (not a ref) on purpose: mutating a ref doesn't trigger a
+  // re-render, so the SaveBar's `open` prop would keep showing the stale
+  // pre-save value until something else happened to re-render the page.
+  const [saved, setSaved] = useState({
+    name: cart.name,
+    settings: cart.settings,
+    status: cart.status,
+  });
   const isDirty =
-    name !== savedRef.current.name ||
-    JSON.stringify(settings) !== JSON.stringify(savedRef.current.settings);
+    name !== saved.name ||
+    status !== saved.status ||
+    JSON.stringify(settings) !== JSON.stringify(saved.settings);
   const isSaving = fetcher.state !== "idle";
 
   const updateSetting = useCallback((key, value) => {
@@ -261,34 +273,31 @@ export default function CartEditor() {
 
   const handleSave = useCallback(() => {
     fetcher.submit(
-      { intent: "save", name, settings: JSON.stringify(settings) },
+      { intent: "save", name, status, settings: JSON.stringify(settings) },
       { method: "POST" },
     );
-  }, [fetcher, name, settings]);
+  }, [fetcher, name, status, settings]);
 
   const handleDiscard = useCallback(() => {
-    setName(savedRef.current.name);
-    setSettings(savedRef.current.settings);
-  }, []);
+    setName(saved.name);
+    setStatus(saved.status);
+    setSettings(saved.settings);
+  }, [saved]);
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.done === "save") {
-      savedRef.current = { name, settings };
-      shopify.toast.show("Cart saved");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetcher.state, fetcher.data]);
-
-  useEffect(() => {
-    if (statusFetcher.state === "idle" && statusFetcher.data?.done) {
+      const statusChanged = status !== saved.status;
+      setSaved({ name, settings, status });
       shopify.toast.show(
-        statusFetcher.data.done === "publish"
-          ? "Cart published"
-          : "Cart unpublished",
+        statusChanged
+          ? status === "PUBLISHED"
+            ? "Cart published"
+            : "Cart unpublished"
+          : "Cart saved",
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFetcher.state, statusFetcher.data]);
+  }, [fetcher.state, fetcher.data]);
 
   // Live-sync current (unsaved) settings into the preview frame. Real
   // products ride along too — the drawer only applies them once (on the
@@ -310,13 +319,9 @@ export default function CartEditor() {
     [drawerCss, drawerJs],
   );
 
-  // Status reflects the server truth (this page's fetchers revalidate it).
-  const status = statusFetcher.formData
-    ? statusFetcher.formData.get("intent") === "publish"
-      ? "PUBLISHED"
-      : "DRAFT"
-    : cart.status;
-  const isPublished = status === "PUBLISHED";
+  // The title badge reflects the last *saved* status, not the pending
+  // dropdown selection — it only flips once Save actually persists it.
+  const isPublished = saved.status === "PUBLISHED";
 
   const active = EDITOR_SECTIONS.find((s) => s.id === activeSection);
   const ActiveComponent = active?.Component ?? GeneralTab;
@@ -351,7 +356,7 @@ export default function CartEditor() {
           content: "Delete",
           destructive: true,
           onAction: () => {
-            statusFetcher.submit({ intent: "delete" }, { method: "POST" });
+            deleteFetcher.submit({ intent: "delete" }, { method: "POST" });
             navigate("/app");
           },
         },
@@ -375,23 +380,21 @@ export default function CartEditor() {
               <Text as="h2" variant="headingSm">
                 Publishing
               </Text>
+              <Select
+                label="Status"
+                labelHidden
+                options={[
+                  { label: "Draft", value: "DRAFT" },
+                  { label: "Published", value: "PUBLISHED" },
+                ]}
+                value={status}
+                onChange={setStatus}
+              />
               <Text as="p" variant="bodySm" tone="subdued">
-                {isPublished
-                  ? "This cart is live on your storefront."
-                  : "Publishing makes this cart live and unpublishes any other."}
+                {status === "PUBLISHED"
+                  ? "Goes live on your storefront when saved — unpublishes any other published cart."
+                  : "Not visible on your storefront."}
               </Text>
-              <Button
-                variant={isPublished ? "secondary" : "primary"}
-                loading={statusFetcher.state !== "idle"}
-                onClick={() =>
-                  statusFetcher.submit(
-                    { intent: isPublished ? "unpublish" : "publish" },
-                    { method: "POST" },
-                  )
-                }
-              >
-                {isPublished ? "Unpublish" : "Publish"}
-              </Button>
             </BlockStack>
           </Card>
 
