@@ -5,15 +5,20 @@ import {
   Layout,
   Text,
   Card,
+  Box,
   BlockStack,
+  InlineStack,
   InlineGrid,
   Badge,
+  Icon,
+  Button,
   IndexTable,
   IndexFilters,
   useSetIndexFiltersMode,
   useIndexResourceState,
   EmptyState,
 } from "@shopify/polaris";
+import { AlertTriangleIcon, ExternalIcon } from "@shopify/polaris-icons";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
@@ -23,10 +28,14 @@ import {
   publishCartConfig,
   unpublishCartConfig,
 } from "../models/cart-config.server";
+import { getAppEmbedStatus } from "../models/theme.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const configs = await getCartConfigs(session.shop);
+  const { session, admin } = await authenticate.admin(request);
+  const [configs, embedStatus] = await Promise.all([
+    getCartConfigs(session.shop),
+    getAppEmbedStatus(admin, session.shop),
+  ]);
   return {
     carts: configs.map((config) => ({
       id: config.id,
@@ -34,6 +43,8 @@ export const loader = async ({ request }) => {
       status: config.status,
       updatedAt: config.updatedAt,
     })),
+    embedEnabled: embedStatus.enabled,
+    themeEditorUrl: embedStatus.themeEditorUrl,
   };
 };
 
@@ -58,6 +69,50 @@ export const action = async ({ request }) => {
   return { done: intent };
 };
 
+function AppEmbedNotice({ published, themeEditorUrl }) {
+  return (
+    <Box
+      background="bg-surface-secondary"
+      borderColor="border"
+      borderWidth="025"
+      borderStyle="dashed"
+      borderRadius="300"
+      padding="400"
+    >
+      <InlineStack align="space-between" blockAlign="center" gap="400">
+        <InlineStack align="start" gap="400" blockAlign="center" wrap={false}>
+          <Box
+            background="bg-surface"
+            borderColor="border"
+            borderWidth="025"
+            borderRadius="200"
+            padding="300"
+          >
+            <Icon source={AlertTriangleIcon} tone="caution" />
+          </Box>
+          <BlockStack gap="100" inlineAlign="start">
+            <InlineStack align="start" gap="200" blockAlign="center">
+              <Text as="h3" variant="headingSm">
+                {published > 0
+                  ? "Your cart drawer isn't live"
+                  : "No live carts configured"}
+              </Text>
+              <Badge tone="warning">App embed off</Badge>
+            </InlineStack>
+            <Text as="p" variant="bodyMd" tone="subdued">
+              Enable the Cart drawer app embed in your theme editor so your
+              cart appears on your storefront.
+            </Text>
+          </BlockStack>
+        </InlineStack>
+        <Button url={themeEditorUrl} external icon={ExternalIcon}>
+          Enable app embed
+        </Button>
+      </InlineStack>
+    </Box>
+  );
+}
+
 function StatCard({ label, value }) {
   return (
     <Card>
@@ -74,7 +129,7 @@ function StatCard({ label, value }) {
 }
 
 export default function Dashboard() {
-  const { carts } = useLoaderData();
+  const { carts, embedEnabled, themeEditorUrl } = useLoaderData();
   const fetcher = useFetcher();
   const createFetcher = useFetcher();
   const navigate = useNavigate();
@@ -161,6 +216,10 @@ export default function Dashboard() {
     >
       <TitleBar title="Magyx Cart Drawer" />
       <BlockStack gap="500">
+        {!embedEnabled && (
+          <AppEmbedNotice published={published} themeEditorUrl={themeEditorUrl} />
+        )}
+
         <InlineGrid columns={{ xs: 1, sm: 3 }} gap="400">
           <StatCard label="Total carts" value={String(total)} />
           <StatCard label="Published" value={String(published)} />

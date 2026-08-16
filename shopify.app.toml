@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "2e78b283b92c4c00be0f24c21a3dd9a0"
-name = "magyx-cart-drawer"
+name = "Magyx Cart Drawer"
 application_url = "https://magyx-cart-drawer-production.up.railway.app"
 embedded = true
 
@@ -13,7 +13,7 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,write_products"
+scopes = "read_products,write_products,read_themes"
 
 [auth]
 redirect_urls = [ "https://magyx-cart-drawer-production.up.railway.app/api/auth" ]
