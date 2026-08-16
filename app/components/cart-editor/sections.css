@@ -1,0 +1,7 @@
+/* The color swatch sits in the TextField suffix; Polaris's default suffix
+   margins (100 inner / 300 outer) leave the swatch floating away from the
+   field edge, so swap them for color fields only. */
+.magyx-color-field .Polaris-TextField__Suffix {
+  margin-left: var(--p-space-300);
+  margin-right: var(--p-space-100);
+}

@@ -1,0 +1,73 @@
+<magyx-cart-trigger
+  data-script-src="{{ 'magyx-cart-drawer.js' | asset_url }}"
+  data-cart-icon-type="{{ block.settings.cart_icon_type }}"
+  data-cart-icon-color="{{ block.settings.cart_icon_color }}"
+  data-cart-icon-size="{{ block.settings.cart_icon_size }}"
+  data-cart-bubble-bg="{{ block.settings.cart_bubble_bg }}"
+  data-cart-bubble-text="{{ block.settings.cart_bubble_text }}"
+  data-show-cart-count="{{ block.settings.show_cart_count }}"
+  data-label="{{ block.settings.accessibility_label | escape }}"
+></magyx-cart-trigger>
+
+{% schema %}
+{
+  "name": "Cart icon",
+  "target": "section",
+  "stylesheet": "magyx-cart-drawer.css",
+  "javascript": "magyx-cart-loader.js",
+  "settings": [
+    {
+      "type": "select",
+      "id": "cart_icon_type",
+      "label": "Icon",
+      "default": "bag-1",
+      "options": [
+        { "value": "bag-1", "label": "Bag 1" },
+        { "value": "bag-2", "label": "Bag 2" },
+        { "value": "cart", "label": "Cart" },
+        { "value": "basket", "label": "Basket" }
+      ]
+    },
+    {
+      "type": "color",
+      "id": "cart_icon_color",
+      "label": "Icon color",
+      "default": "#000000"
+    },
+    {
+      "type": "range",
+      "id": "cart_icon_size",
+      "label": "Icon size",
+      "min": 18,
+      "max": 36,
+      "step": 1,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "checkbox",
+      "id": "show_cart_count",
+      "label": "Show cart count",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "cart_bubble_bg",
+      "label": "Count bubble background",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "cart_bubble_text",
+      "label": "Count bubble text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "text",
+      "id": "accessibility_label",
+      "label": "Accessibility label",
+      "default": "Open cart"
+    }
+  ]
+}
+{% endschema %}

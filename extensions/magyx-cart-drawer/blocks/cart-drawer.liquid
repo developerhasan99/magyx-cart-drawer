@@ -1,0 +1,24 @@
+{% liquid
+  assign current_product_id = ''
+  if product
+    assign current_product_id = product.id
+  endif
+
+  assign shop_domain = shop.permanent_domain
+%}
+
+<magyx-cart-drawer
+  data-block-id="{{ block.id }}"
+  data-script-src="{{ 'magyx-cart-drawer.js' | asset_url }}"
+  data-current-product-id="{{ current_product_id }}"
+  data-shop-domain="{{ shop_domain }}"></magyx-cart-drawer>
+
+{% schema %}
+{
+  "name": "Cart drawer",
+  "target": "body",
+  "stylesheet": "magyx-cart-drawer.css",
+  "javascript": "magyx-cart-loader.js",
+  "settings": []
+}
+{% endschema %}
