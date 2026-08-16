@@ -1,13 +1,14 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Local development schema — mirrors prisma/schema.prisma but targets SQLite
+// so `npm run dev` works with zero local setup. Keep models in sync with the
+// production schema (prisma/schema.prisma, which targets Postgres).
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
 }
 
 model Session {

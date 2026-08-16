@@ -2,12 +2,11 @@
 
 client_id = "2e78b283b92c4c00be0f24c21a3dd9a0"
 name = "magyx-cart-drawer"
-application_url = "https://example.com"
+application_url = "https://magyx-cart-drawer-production.up.railway.app"
 embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
-include_config_on_deploy = true
 
 [webhooks]
 api_version = "2026-10"
@@ -17,4 +16,4 @@ api_version = "2026-10"
 scopes = "read_products,write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://magyx-cart-drawer-production.up.railway.app/api/auth" ]
