@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS = {
   show_cart_count: true,
   cart_bubble_bg: "#000000",
   cart_bubble_text: "#ffffff",
-  btn_radius: 5,
+  btn_radius: 12,
   btn_color: "#000000",
   btn_text_color: "#ffffff",
   btn_hover_color: "#333333",
@@ -58,6 +58,18 @@ export const DEFAULT_SETTINGS = {
   show_strikethrough: true,
   show_savings: true,
 
+  // Gift wrap
+  enable_gift_wrap: false,
+  gift_wrap_label: "Wrap my order as a gift",
+  // The real Shopify product/variant added to cart when checked — its own
+  // price is what the customer is charged. Cached fields (title/image/price)
+  // let the drawer show "+ $X" without a live lookup on every render.
+  gift_wrap_product_id: "",
+  gift_wrap_variant_id: "",
+  gift_wrap_product_title: "",
+  gift_wrap_product_image: "",
+  gift_wrap_price: 0, // cents, matches formatMoney()
+
   // Upsells
   show_upsells: true,
   show_upsells_on_empty: true,
@@ -76,9 +88,15 @@ export const DEFAULT_SETTINGS = {
   shipping_notice_text: "Shipping and taxes will be calculated at checkout.",
   show_subtotal_on_checkout: true,
 
-  // Badges
+  // Badges & trust rows
   show_trust_badges: true,
   trust_badge_image: "",
+  show_delivery_estimate: false,
+  delivery_estimate_text: "Delivery in 1-3 business days",
+  show_return_policy: false,
+  return_policy_text: "Free returns within 30 days",
+  show_reviews_trust: false,
+  reviews_trust_text: "5,000+ 5-star reviews",
 
   // General
   cart_title: "Your Cart",

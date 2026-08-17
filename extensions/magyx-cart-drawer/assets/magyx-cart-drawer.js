@@ -58,6 +58,13 @@
     enableTotalLine: true,
     showShippingNotice: true,
     showSubtotalOnCheckout: true,
+    enableGiftWrap: false,
+    giftWrapLabel: "Wrap my order as a gift",
+    giftWrapProductId: "",
+    giftWrapVariantId: "",
+    giftWrapProductTitle: "",
+    giftWrapProductImage: "",
+    giftWrapPrice: 0,
     showUpsells: true,
     showUpsellsOnEmpty: true,
     upsellTitle: "You might also like...",
@@ -66,6 +73,12 @@
     upsellBtnText: "Add to Cart",
     showTrustBadges: true,
     trustBadgeUrl: "",
+    showDeliveryEstimate: false,
+    deliveryEstimateText: "Delivery in 1-3 business days",
+    showReturnPolicy: false,
+    returnPolicyText: "Free returns within 30 days",
+    showReviewsTrust: false,
+    reviewsTrustText: "5,000+ 5-star reviews",
     customCss: "",
     transCheckoutBtn: "Checkout",
     transContinueShopping: "Continue Shopping",
@@ -121,6 +134,7 @@
       tag: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="${iconClass}"><path d="M8.575 4.649a3.75 3.75 0 0 1 2.7-1.149h1.975a3.25 3.25 0 0 1 3.25 3.25v2.187a3.25 3.25 0 0 1-.996 2.34l-4.747 4.572a2.5 2.5 0 0 1-3.502-.033l-2.898-2.898a2.75 2.75 0 0 1-.036-3.852l4.254-4.417Zm4.425 3.351a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" fill-rule="evenodd"></path></svg>`,
       gift: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="${iconClass}"><path d="M7.835 9.5h-.96c-.343 0-.625-.28-.625-.628 0-.344.28-.622.619-.622.242 0 .463.142.563.363l.403.887Z"></path><path d="M10.665 9.5h.96c.343 0 .625-.28.625-.628 0-.344-.28-.622-.619-.622-.242 0-.463.142-.563.363l-.403.887Z"></path><path fill-rule="evenodd" d="M8.5 4h-3.25c-1.519 0-2.75 1.231-2.75 2.75v2.25h1.25c.414 0 .75.336.75.75s-.336.75-.75.75h-1.25v2.75c0 1.519 1.231 2.75 2.75 2.75h3.441c-.119-.133-.191-.308-.191-.5v-2c0-.414.336-.75.75-.75s.75.336.75.75v2c0 .192-.072.367-.191.5h4.941c1.519 0 2.75-1.231 2.75-2.75v-2.75h-2.75c-.414 0-.75-.336-.75-.75s.336-.75.75-.75h2.75v-2.25c0-1.519-1.231-2.75-2.75-2.75h-4.75v2.25c0 .414-.336.75-.75.75s-.75-.336-.75-.75v-2.25Z"></path></svg>`,
       star: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${iconClass}"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`,
+      return: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${iconClass}"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>`,
       image: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${iconClass}"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`,
       close: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="${iconClass}"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
       trash: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="${iconClass}"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-.5.2-1 .6-1h6c.4 0 .6.5.6 1v2"></path></svg>`,
@@ -563,6 +577,34 @@
           apiSettings.show_subtotal_on_checkout,
           DEFAULTS.showSubtotalOnCheckout,
         ),
+        enableGiftWrap: asBoolean(
+          apiSettings.enable_gift_wrap,
+          DEFAULTS.enableGiftWrap,
+        ),
+        giftWrapLabel: asText(
+          apiSettings.gift_wrap_label,
+          DEFAULTS.giftWrapLabel,
+        ),
+        giftWrapProductId: asText(
+          apiSettings.gift_wrap_product_id,
+          DEFAULTS.giftWrapProductId,
+        ),
+        giftWrapVariantId: asText(
+          apiSettings.gift_wrap_variant_id,
+          DEFAULTS.giftWrapVariantId,
+        ),
+        giftWrapProductTitle: asText(
+          apiSettings.gift_wrap_product_title,
+          DEFAULTS.giftWrapProductTitle,
+        ),
+        giftWrapProductImage: asText(
+          apiSettings.gift_wrap_product_image,
+          DEFAULTS.giftWrapProductImage,
+        ),
+        giftWrapPrice: asNumber(
+          apiSettings.gift_wrap_price,
+          DEFAULTS.giftWrapPrice,
+        ),
         showUpsells: asBoolean(apiSettings.show_upsells, DEFAULTS.showUpsells),
         showUpsellsOnEmpty: asBoolean(
           apiSettings.show_upsells_on_empty,
@@ -585,6 +627,30 @@
         trustBadgeUrl: asText(
           apiSettings.trust_badge_image,
           DEFAULTS.trustBadgeUrl,
+        ),
+        showDeliveryEstimate: asBoolean(
+          apiSettings.show_delivery_estimate,
+          DEFAULTS.showDeliveryEstimate,
+        ),
+        deliveryEstimateText: asText(
+          apiSettings.delivery_estimate_text,
+          DEFAULTS.deliveryEstimateText,
+        ),
+        showReturnPolicy: asBoolean(
+          apiSettings.show_return_policy,
+          DEFAULTS.showReturnPolicy,
+        ),
+        returnPolicyText: asText(
+          apiSettings.return_policy_text,
+          DEFAULTS.returnPolicyText,
+        ),
+        showReviewsTrust: asBoolean(
+          apiSettings.show_reviews_trust,
+          DEFAULTS.showReviewsTrust,
+        ),
+        reviewsTrustText: asText(
+          apiSettings.reviews_trust_text,
+          DEFAULTS.reviewsTrustText,
         ),
         customCss: asText(apiSettings.custom_css, DEFAULTS.customCss),
         transCheckoutBtn: asText(
@@ -831,7 +897,10 @@
         return;
       }
 
-      event.preventDefault();
+      // A checkbox's native check/uncheck happens as part of its own click
+      // activation — preventDefault() here would undo that toggle, so this
+      // one action is left to flip on its own before the mutation runs.
+      if (action !== "toggle-gift-wrap") event.preventDefault();
 
       if (action === "open") {
         this.openCart(true);
@@ -855,6 +924,8 @@
         await this.removeCoupon(control.dataset.code || "");
       } else if (action === "add-upsell") {
         await this.addUpsell(control);
+      } else if (action === "toggle-gift-wrap") {
+        await this.toggleGiftWrap(control.checked);
       }
     }
 
@@ -1057,6 +1128,64 @@
       });
     }
 
+    /** Gift wrap is a real product/variant, added or removed as an actual
+     * cart line so the customer is genuinely charged for it — the checkbox
+     * just mirrors whether that line currently exists. It's filtered out of
+     * the regular item list (see renderItems call site) so it only ever
+     * shows as this one toggle row, not a duplicate line card. */
+    toggleGiftWrap(checked) {
+      const variantId = this.settings.giftWrapVariantId;
+      if (!variantId) return Promise.resolve();
+
+      return this.enqueueMutation(async () => {
+        if (this.isPreview) {
+          if (checked) {
+            this.cart.items.push({
+              key: "preview-gift-wrap",
+              variant_id: variantId,
+              product_id: this.settings.giftWrapProductId,
+              quantity: 1,
+              product_title:
+                this.settings.giftWrapProductTitle ||
+                this.settings.giftWrapLabel,
+              variant_title: "",
+              url: "#",
+              image: this.settings.giftWrapProductImage,
+              original_price: this.settings.giftWrapPrice,
+              final_price: this.settings.giftWrapPrice,
+              line_level_discount_allocations: [],
+              properties: {},
+            });
+          } else {
+            this.cart.items = this.cart.items.filter(
+              (item) => item.key !== "preview-gift-wrap",
+            );
+          }
+          this.cart = recalculatePreviewCart(this.cart);
+          this.count = this.cart.item_count;
+          this.updateContents();
+          return;
+        }
+
+        if (checked) {
+          await this.postJson("cart/add.js", {
+            items: [{ id: Number(variantId), quantity: 1 }],
+          });
+        } else {
+          const existing = (this.cart?.items || []).find(
+            (item) => String(item.variant_id) === String(variantId),
+          );
+          if (existing) {
+            await this.postJson("cart/change.js", {
+              id: existing.key,
+              quantity: 0,
+            });
+          }
+        }
+        await this.refreshCart();
+      });
+    }
+
     openCart(forceRefresh = false) {
       if (!this.isOpen) {
         this.previousBodyOverflow = document.body.style.overflow;
@@ -1245,7 +1374,7 @@
       this.innerHTML = `
         ${settings.customCss ? `<style>${settings.customCss}</style>` : ""}
         ${settings.showFloatingTrigger ? this.renderFloatingTrigger() : ""}
-        <div class="bc-drawer-wrap ${this.isOpen ? "is-open" : ""}" style="${this.cssVars()}; font-family: ${settings.inheritFonts ? "inherit" : "sans-serif"};">
+        <div class="bc-drawer-wrap ${this.isOpen ? "is-open" : ""}" style="${this.cssVars()}; font-family: ${settings.inheritFonts ? "inherit" : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'};">
           <div class="bc-overlay" data-magyx-action="close"></div>
           <aside class="bc-drawer-panel" role="dialog" aria-modal="true" aria-label="${escapeHtml(settings.cartTitle)}">
             <div class="bc-drawer-header">
@@ -1308,10 +1437,21 @@
       const previousScroll =
         container.querySelector(".bc-cart-contents-scroll")?.scrollTop || 0;
 
+      // The gift-wrap variant (if any) rides along as a real cart line so
+      // checkout actually charges for it, but it's rendered as its own
+      // toggle row below — not duplicated as a second line-item card here.
+      const giftWrapVariantId = this.settings.giftWrapVariantId;
+      const visibleItems = giftWrapVariantId
+        ? (cart.items || []).filter(
+            (item) => String(item.variant_id) !== String(giftWrapVariantId),
+          )
+        : cart.items || [];
+
       const scrollRegion = `
         <div class="bc-cart-contents-scroll">
           ${this.renderRewards(cart)}
-          ${isEmpty ? this.renderEmptyCart() : this.renderItems(cart.items || [])}
+          ${isEmpty ? this.renderEmptyCart() : this.renderItems(visibleItems)}
+          ${isEmpty ? "" : this.renderGiftWrap()}
           ${this.renderUpsells(isEmpty)}
         </div>
       `;
@@ -1495,6 +1635,30 @@
         <div class="bc-item-list">
           ${items.map((item) => this.renderItem(item)).join("")}
         </div>
+      `;
+    }
+
+    renderGiftWrap() {
+      const settings = this.settings;
+      if (!settings.enableGiftWrap || !settings.giftWrapVariantId) return "";
+
+      const isWrapped = (this.cart?.items || []).some(
+        (item) => String(item.variant_id) === String(settings.giftWrapVariantId),
+      );
+
+      return `
+        <label class="bc-gift-wrap-row">
+          <span class="bc-gift-wrap-icon-wrap">${iconSvg("gift", "bc-gift-wrap-icon")}</span>
+          <span class="bc-gift-wrap-text">${escapeHtml(settings.giftWrapLabel)}</span>
+          <span class="bc-gift-wrap-price">+ ${this.formatMoney(settings.giftWrapPrice)}</span>
+          <input
+            type="checkbox"
+            class="bc-gift-wrap-checkbox"
+            data-magyx-action="toggle-gift-wrap"
+            aria-label="${escapeHtml(settings.giftWrapLabel)}"
+            ${isWrapped ? "checked" : ""}
+          >
+        </label>
       `;
     }
 
@@ -1715,34 +1879,36 @@
         <div class="bc-drawer-footer">
           ${this.error ? `<div class="bc-cart-error" role="alert">${escapeHtml(this.error)}</div>` : ""}
           ${settings.enableCoupon ? this.renderCoupon() : ""}
-          ${
-            settings.enableSubtotalLine
-              ? `<div class="bc-summary-row">
-                  <span>${escapeHtml(settings.transSubtotal)}</span>
-                  <span class="val-wrap">${this.formatMoney(cart.items_subtotal_price || cart.original_total_price || 0)}</span>
-                </div>`
-              : ""
-          }
-          ${
-            Number(cart.total_discount || 0) > 0
-              ? `<div class="bc-summary-row">
-                  <div class="label-wrap">
-                    <span>${escapeHtml(settings.transDiscounts)}:</span>
-                    ${discountCodes.map((code) => this.renderDiscountBadge(code)).join("")}
-                  </div>
-                  <span class="val-wrap bc-discount-val">- ${this.formatMoney(cart.total_discount)}</span>
-                </div>`
-              : ""
-          }
-          ${
-            settings.enableTotalLine
-              ? `<div class="bc-summary-row bc-total-row">
-                  <span>${escapeHtml(settings.transTotal)}</span>
-                  <span class="val-wrap">${this.formatMoney(cart.total_price || 0)}</span>
-                </div>`
-              : ""
-          }
-          ${settings.showShippingNotice ? `<div class="bc-shipping-notice">${escapeHtml(settings.shippingNoticeText)}</div>` : ""}
+          <div class="bc-summary-block">
+            ${
+              settings.enableSubtotalLine
+                ? `<div class="bc-summary-row">
+                    <span>${escapeHtml(settings.transSubtotal)}</span>
+                    <span class="val-wrap">${this.formatMoney(cart.items_subtotal_price || cart.original_total_price || 0)}</span>
+                  </div>`
+                : ""
+            }
+            ${
+              Number(cart.total_discount || 0) > 0
+                ? `<div class="bc-summary-row">
+                    <div class="label-wrap">
+                      <span>${escapeHtml(settings.transDiscounts)}:</span>
+                      ${discountCodes.map((code) => this.renderDiscountBadge(code)).join("")}
+                    </div>
+                    <span class="val-wrap bc-discount-val">- ${this.formatMoney(cart.total_discount)}</span>
+                  </div>`
+                : ""
+            }
+            ${
+              settings.enableTotalLine
+                ? `<div class="bc-summary-row bc-total-row">
+                    <span>${escapeHtml(settings.transTotal)}</span>
+                    <span class="val-wrap">${this.formatMoney(cart.total_price || 0)}</span>
+                  </div>`
+                : ""
+            }
+            ${settings.showShippingNotice ? `<div class="bc-shipping-notice">${escapeHtml(settings.shippingNoticeText)}</div>` : ""}
+          </div>
           <div class="bc-checkout-btn-wrap">
             <a href="${this.route("checkout")}" class="bc-checkout-btn" data-magyx-action="checkout">
               <span>${escapeHtml(settings.transCheckoutBtn)}</span>
@@ -1758,6 +1924,39 @@
               ? `<div class="bc-trust-badges"><img src="${escapeHtml(settings.trustBadgeUrl)}" alt="Payment badges" loading="lazy"></div>`
               : ""
           }
+          ${this.renderTrustInfo()}
+        </div>
+      `;
+    }
+
+    renderTrustInfo() {
+      const settings = this.settings;
+      const rows = [
+        settings.showDeliveryEstimate && settings.deliveryEstimateText
+          ? { icon: "truck", text: settings.deliveryEstimateText }
+          : null,
+        settings.showReturnPolicy && settings.returnPolicyText
+          ? { icon: "return", text: settings.returnPolicyText }
+          : null,
+        settings.showReviewsTrust && settings.reviewsTrustText
+          ? { icon: "star", text: settings.reviewsTrustText }
+          : null,
+      ].filter(Boolean);
+
+      if (!rows.length) return "";
+
+      return `
+        <div class="bc-trust-info">
+          ${rows
+            .map(
+              (row) => `
+                <div class="bc-trust-info-row">
+                  ${iconSvg(row.icon, "bc-trust-info-icon")}
+                  <span>${escapeHtml(row.text)}</span>
+                </div>
+              `,
+            )
+            .join("")}
         </div>
       `;
     }
@@ -1766,7 +1965,10 @@
       return `
         <div class="bc-coupon-accordion">
           <button type="button" class="bc-coupon-toggle" data-magyx-action="toggle-coupon" aria-expanded="${this.couponOpen ? "true" : "false"}">
-            <span>${escapeHtml(this.settings.transCouponAccordionTitle)}</span>
+            <span class="bc-coupon-toggle-label">
+              ${iconSvg("tag", "bc-coupon-toggle-label-icon")}
+              <span>${escapeHtml(this.settings.transCouponAccordionTitle)}</span>
+            </span>
             <span class="bc-coupon-toggle-icon ${this.couponOpen ? "is-open" : ""}">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
             </span>

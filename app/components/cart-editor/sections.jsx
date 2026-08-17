@@ -3,10 +3,12 @@ import { useCallback, useState } from "react";
 import {
   BlockStack,
   Box,
+  Button,
   Checkbox,
   ColorPicker as PolarisColorPicker,
   Divider,
   InlineGrid,
+  InlineStack,
   Popover,
   Select,
   Text,
@@ -15,6 +17,7 @@ import {
   hsbToHex,
   rgbToHsb,
 } from "@shopify/polaris";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import "./sections.css";
 
 /** Section shell: heading + subdued description, standard Polaris type. */
@@ -501,6 +504,98 @@ export function CartItemsTab({ settings, updateSetting }) {
   );
 }
 
+export function GiftWrapTab({ settings, updateSetting }) {
+  const shopify = useAppBridge();
+
+  const pickWrapProduct = useCallback(async () => {
+    const selection = await shopify.resourcePicker({
+      type: "product",
+      multiple: false,
+      action: "select",
+      filter: { draft: false, archived: false, variants: false },
+    });
+    const product = selection?.[0];
+    const variant = product?.variants?.[0];
+    if (!product || !variant) return;
+
+    updateSetting("gift_wrap_product_id", product.id);
+    updateSetting("gift_wrap_variant_id", variant.id);
+    updateSetting("gift_wrap_product_title", product.title);
+    updateSetting(
+      "gift_wrap_product_image",
+      product.images?.[0]?.originalSrc || "",
+    );
+    updateSetting(
+      "gift_wrap_price",
+      Math.round(parseFloat(variant.price || "0") * 100),
+    );
+  }, [shopify, updateSetting]);
+
+  return (
+    <Section
+      title="Gift wrap"
+      description="Let customers add gift wrapping as a checkbox in the cart."
+    >
+      <BlockStack gap="300">
+        <Checkbox
+          label="Enable gift wrap option"
+          checked={settings.enable_gift_wrap}
+          onChange={(value) => updateSetting("enable_gift_wrap", value)}
+        />
+        <TextField
+          label="Checkbox label"
+          value={settings.gift_wrap_label}
+          onChange={(value) => updateSetting("gift_wrap_label", value)}
+          autoComplete="off"
+        />
+      </BlockStack>
+
+      <Group title="Wrap product">
+        <Text as="p" variant="bodyMd" tone="subdued">
+          Create a product in your store for gift wrapping (e.g. &quot;Gift
+          Wrapping&quot;, priced however you like), then pick it here — its
+          real price is what customers are charged when they check the box.
+          Consider hiding it from your storefront and search results so it
+          only ever appears through the cart.
+        </Text>
+        {settings.gift_wrap_product_title ? (
+          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+            <InlineStack align="space-between" blockAlign="center" gap="300">
+              <InlineStack gap="300" blockAlign="center">
+                {settings.gift_wrap_product_image ? (
+                  <img
+                    src={settings.gift_wrap_product_image}
+                    alt=""
+                    style={{
+                      width: 40,
+                      height: 40,
+                      objectFit: "cover",
+                      borderRadius: 6,
+                    }}
+                  />
+                ) : null}
+                <BlockStack gap="0">
+                  <Text as="span" variant="bodyMd" fontWeight="medium">
+                    {settings.gift_wrap_product_title}
+                  </Text>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    {(settings.gift_wrap_price / 100).toFixed(2)}
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              <Button onClick={pickWrapProduct}>Change</Button>
+            </InlineStack>
+          </Box>
+        ) : (
+          <div>
+            <Button onClick={pickWrapProduct}>Choose product</Button>
+          </div>
+        )}
+      </Group>
+    </Section>
+  );
+}
+
 export function UpsellsTab({ settings, updateSetting }) {
   return (
     <Section
@@ -670,7 +765,7 @@ export function BadgesTab({ settings, updateSetting }) {
   return (
     <Section
       title="Trust badges"
-      description="Show payment or trust badges under the checkout button."
+      description="Show payment badges and trust rows under the checkout button."
     >
       <BlockStack gap="300">
         <Checkbox
@@ -699,6 +794,49 @@ export function BadgesTab({ settings, updateSetting }) {
           </Box>
         ) : null}
       </BlockStack>
+
+      <Group title="Trust rows">
+        <BlockStack gap="300">
+          <Checkbox
+            label="Show delivery estimate"
+            checked={settings.show_delivery_estimate}
+            onChange={(value) =>
+              updateSetting("show_delivery_estimate", value)
+            }
+          />
+          <TextField
+            label="Delivery estimate text"
+            value={settings.delivery_estimate_text}
+            onChange={(value) =>
+              updateSetting("delivery_estimate_text", value)
+            }
+            autoComplete="off"
+          />
+          <Checkbox
+            label="Show return policy"
+            checked={settings.show_return_policy}
+            onChange={(value) => updateSetting("show_return_policy", value)}
+          />
+          <TextField
+            label="Return policy text"
+            value={settings.return_policy_text}
+            onChange={(value) => updateSetting("return_policy_text", value)}
+            autoComplete="off"
+          />
+          <Checkbox
+            label="Show reviews trust line"
+            checked={settings.show_reviews_trust}
+            onChange={(value) => updateSetting("show_reviews_trust", value)}
+          />
+          <TextField
+            label="Reviews trust text"
+            value={settings.reviews_trust_text}
+            onChange={(value) => updateSetting("reviews_trust_text", value)}
+            helpText="Free text — not pulled from a reviews app, so keep it accurate."
+            autoComplete="off"
+          />
+        </BlockStack>
+      </Group>
     </Section>
   );
 }
