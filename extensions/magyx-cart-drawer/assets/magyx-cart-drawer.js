@@ -60,11 +60,20 @@
     showSubtotalOnCheckout: true,
     enableGiftWrap: false,
     giftWrapLabel: "Wrap my order as a gift",
+    giftWrapPlacement: "before-upsells",
     giftWrapProductId: "",
     giftWrapVariantId: "",
     giftWrapProductTitle: "",
     giftWrapProductImage: "",
     giftWrapPrice: 0,
+    enableShippingProtection: false,
+    shippingProtectionLabel: "Shipping protection",
+    shippingProtectionDescription: "Protect your order against loss and damage.",
+    shippingProtectionProductId: "",
+    shippingProtectionVariantId: "",
+    shippingProtectionProductTitle: "",
+    shippingProtectionProductImage: "",
+    shippingProtectionPrice: 0,
     showUpsells: true,
     showUpsellsOnEmpty: true,
     upsellTitle: "You might also like...",
@@ -585,6 +594,10 @@
           apiSettings.gift_wrap_label,
           DEFAULTS.giftWrapLabel,
         ),
+        giftWrapPlacement: asText(
+          apiSettings.gift_wrap_placement,
+          DEFAULTS.giftWrapPlacement,
+        ),
         giftWrapProductId: asText(
           apiSettings.gift_wrap_product_id,
           DEFAULTS.giftWrapProductId,
@@ -604,6 +617,38 @@
         giftWrapPrice: asNumber(
           apiSettings.gift_wrap_price,
           DEFAULTS.giftWrapPrice,
+        ),
+        enableShippingProtection: asBoolean(
+          apiSettings.enable_shipping_protection,
+          DEFAULTS.enableShippingProtection,
+        ),
+        shippingProtectionLabel: asText(
+          apiSettings.shipping_protection_label,
+          DEFAULTS.shippingProtectionLabel,
+        ),
+        shippingProtectionDescription: asText(
+          apiSettings.shipping_protection_description,
+          DEFAULTS.shippingProtectionDescription,
+        ),
+        shippingProtectionProductId: asText(
+          apiSettings.shipping_protection_product_id,
+          DEFAULTS.shippingProtectionProductId,
+        ),
+        shippingProtectionVariantId: asText(
+          apiSettings.shipping_protection_variant_id,
+          DEFAULTS.shippingProtectionVariantId,
+        ),
+        shippingProtectionProductTitle: asText(
+          apiSettings.shipping_protection_product_title,
+          DEFAULTS.shippingProtectionProductTitle,
+        ),
+        shippingProtectionProductImage: asText(
+          apiSettings.shipping_protection_product_image,
+          DEFAULTS.shippingProtectionProductImage,
+        ),
+        shippingProtectionPrice: asNumber(
+          apiSettings.shipping_protection_price,
+          DEFAULTS.shippingProtectionPrice,
         ),
         showUpsells: asBoolean(apiSettings.show_upsells, DEFAULTS.showUpsells),
         showUpsellsOnEmpty: asBoolean(
@@ -900,7 +945,12 @@
       // A checkbox's native check/uncheck happens as part of its own click
       // activation — preventDefault() here would undo that toggle, so this
       // one action is left to flip on its own before the mutation runs.
-      if (action !== "toggle-gift-wrap") event.preventDefault();
+      if (
+        action !== "toggle-gift-wrap" &&
+        action !== "toggle-shipping-protection"
+      ) {
+        event.preventDefault();
+      }
 
       if (action === "open") {
         this.openCart();
@@ -926,6 +976,8 @@
         await this.addUpsell(control);
       } else if (action === "toggle-gift-wrap") {
         await this.toggleGiftWrap(control.checked);
+      } else if (action === "toggle-shipping-protection") {
+        await this.toggleShippingProtection(control.checked);
       }
     }
 
@@ -1159,6 +1211,59 @@
           } else {
             this.cart.items = this.cart.items.filter(
               (item) => item.key !== "preview-gift-wrap",
+            );
+          }
+          this.cart = recalculatePreviewCart(this.cart);
+          this.count = this.cart.item_count;
+          this.updateContents();
+          return;
+        }
+
+        if (checked) {
+          await this.postJson("cart/add.js", {
+            items: [{ id: Number(variantId), quantity: 1 }],
+          });
+        } else {
+          const existing = (this.cart?.items || []).find(
+            (item) => String(item.variant_id) === String(variantId),
+          );
+          if (existing) {
+            await this.postJson("cart/change.js", {
+              id: existing.key,
+              quantity: 0,
+            });
+          }
+        }
+        await this.refreshCart();
+      });
+    }
+
+    toggleShippingProtection(checked) {
+      const variantId = this.settings.shippingProtectionVariantId;
+      if (!variantId) return Promise.resolve();
+
+      return this.enqueueMutation(async () => {
+        if (this.isPreview) {
+          if (checked) {
+            this.cart.items.push({
+              key: "preview-shipping-protection",
+              variant_id: variantId,
+              product_id: this.settings.shippingProtectionProductId,
+              quantity: 1,
+              product_title:
+                this.settings.shippingProtectionProductTitle ||
+                this.settings.shippingProtectionLabel,
+              variant_title: "",
+              url: "#",
+              image: this.settings.shippingProtectionProductImage,
+              original_price: this.settings.shippingProtectionPrice,
+              final_price: this.settings.shippingProtectionPrice,
+              line_level_discount_allocations: [],
+              properties: {},
+            });
+          } else {
+            this.cart.items = this.cart.items.filter(
+              (item) => item.key !== "preview-shipping-protection",
             );
           }
           this.cart = recalculatePreviewCart(this.cart);
@@ -1435,22 +1540,29 @@
       const previousScroll =
         container.querySelector(".bc-cart-contents-scroll")?.scrollTop || 0;
 
-      // The gift-wrap variant (if any) rides along as a real cart line so
-      // checkout actually charges for it, but it's rendered as its own
-      // toggle row below — not duplicated as a second line-item card here.
-      const giftWrapVariantId = this.settings.giftWrapVariantId;
-      const visibleItems = giftWrapVariantId
-        ? (cart.items || []).filter(
-            (item) => String(item.variant_id) !== String(giftWrapVariantId),
-          )
-        : cart.items || [];
+      // Product-backed extras are rendered in their own controls rather than
+      // duplicated as ordinary cart line-item cards.
+      const addOnVariantIds = new Set(
+        [
+          this.settings.giftWrapVariantId,
+          this.settings.shippingProtectionVariantId,
+        ]
+          .filter(Boolean)
+          .map(String),
+      );
+      const visibleItems = (cart.items || []).filter(
+        (item) => !addOnVariantIds.has(String(item.variant_id)),
+      );
+      const giftWrapAfterUpsells =
+        this.settings.giftWrapPlacement === "after-upsells";
 
       const scrollRegion = `
         <div class="bc-cart-contents-scroll">
           ${this.renderRewards(cart)}
           ${isEmpty ? this.renderEmptyCart() : this.renderItems(visibleItems)}
-          ${isEmpty ? "" : this.renderGiftWrap()}
+          ${isEmpty || giftWrapAfterUpsells ? "" : this.renderGiftWrap()}
           ${this.renderUpsells(isEmpty)}
+          ${isEmpty || !giftWrapAfterUpsells ? "" : this.renderGiftWrap()}
         </div>
       `;
 
@@ -1655,6 +1767,40 @@
             data-magyx-action="toggle-gift-wrap"
             aria-label="${escapeHtml(settings.giftWrapLabel)}"
             ${isWrapped ? "checked" : ""}
+          >
+        </label>
+      `;
+    }
+
+    renderShippingProtection() {
+      const settings = this.settings;
+      if (
+        !settings.enableShippingProtection ||
+        !settings.shippingProtectionVariantId
+      ) {
+        return "";
+      }
+
+      const isProtected = (this.cart?.items || []).some(
+        (item) =>
+          String(item.variant_id) === String(settings.shippingProtectionVariantId),
+      );
+
+      return `
+        <label class="bc-shipping-protection ${isProtected ? "is-enabled" : "is-disabled"}">
+          <span class="bc-shipping-protection-icon" aria-hidden="true">
+            <img src="${escapeHtml(this.dataset.shippingProtectionIconSrc || "")}" alt="" width="64" height="64">
+          </span>
+          <span class="bc-shipping-protection-copy">
+            <span class="bc-shipping-protection-title">${escapeHtml(settings.shippingProtectionLabel)} <span class="bc-shipping-protection-price">(${this.formatMoney(settings.shippingProtectionPrice)})</span></span>
+            <span class="bc-shipping-protection-description">${escapeHtml(settings.shippingProtectionDescription)}</span>
+          </span>
+          <input
+            type="checkbox"
+            class="bc-shipping-protection-toggle"
+            data-magyx-action="toggle-shipping-protection"
+            aria-label="${escapeHtml(settings.shippingProtectionLabel)}"
+            ${isProtected ? "checked" : ""}
           >
         </label>
       `;
@@ -1876,6 +2022,7 @@
       return `
         <div class="bc-drawer-footer">
           ${this.error ? `<div class="bc-cart-error" role="alert">${escapeHtml(this.error)}</div>` : ""}
+          ${this.renderShippingProtection()}
           ${settings.enableCoupon ? this.renderCoupon() : ""}
           <div class="bc-summary-block">
             ${

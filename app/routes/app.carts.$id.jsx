@@ -44,6 +44,7 @@ import {
   RewardsTab,
   CartItemsTab,
   GiftWrapTab,
+  ShippingProtectionTab,
   UpsellsTab,
   DiscountTab,
   SummaryTab,
@@ -129,9 +130,12 @@ export const loader = async ({ request, params }) => {
 
   // The preview iframe runs the real storefront drawer, so the editor ships
   // the extension's own CSS/JS inline — one source of truth, no copies.
-  const [drawerCss, drawerJs, previewProducts] = await Promise.all([
+  const [drawerCss, drawerJs, shippingProtectionIcon, previewProducts] = await Promise.all([
     readFile(path.join(EXTENSION_ASSETS, "magyx-cart-drawer.css"), "utf8"),
     readFile(path.join(EXTENSION_ASSETS, "magyx-cart-drawer.js"), "utf8"),
+    readFile(path.join(EXTENSION_ASSETS, "shipping-protection.png")).then(
+      (image) => `data:image/png;base64,${image.toString("base64")}`,
+    ),
     fetchPreviewProducts(admin),
   ]);
 
@@ -145,6 +149,7 @@ export const loader = async ({ request, params }) => {
     },
     drawerCss,
     drawerJs,
+    shippingProtectionIcon,
   };
 };
 
@@ -231,6 +236,7 @@ const EDITOR_NAV = [
   {
     title: "Footer",
     items: [
+      { id: "shipping-protection", label: "Shipping protection", icon: ShieldCheckMarkIcon, Component: ShippingProtectionTab },
       { id: "discount", label: "Coupon form", icon: DiscountCodeIcon, Component: DiscountTab },
       { id: "summary", label: "Cart summary", icon: ReceiptIcon, Component: SummaryTab },
       { id: "badges", label: "Trust badges", icon: ShieldCheckMarkIcon, Component: BadgesTab },
@@ -253,7 +259,7 @@ const EDITOR_SECTIONS = EDITOR_NAV.flatMap((group) => group.items);
 /** The preview page is self-contained (srcDoc): extension CSS + JS inlined,
  * drawer element in preview mode. Settings arrive via postMessage so typing
  * in the editor updates the preview without reloading the frame. */
-function buildPreviewDoc(drawerCss, drawerJs) {
+function buildPreviewDoc(drawerCss, drawerJs, shippingProtectionIcon) {
   return `<!doctype html>
 <html>
 <head>
@@ -265,14 +271,14 @@ function buildPreviewDoc(drawerCss, drawerJs) {
 </style>
 </head>
 <body>
-<magyx-cart-drawer data-preview="true"></magyx-cart-drawer>
+<magyx-cart-drawer data-preview="true" data-shipping-protection-icon-src="${shippingProtectionIcon}"></magyx-cart-drawer>
 <script>${drawerJs}</script>
 </body>
 </html>`;
 }
 
 export default function CartEditor() {
-  const { cart, drawerCss, drawerJs, previewProducts } = useLoaderData();
+  const { cart, drawerCss, drawerJs, shippingProtectionIcon, previewProducts } = useLoaderData();
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher();
   const navigate = useNavigate();
@@ -348,8 +354,8 @@ export default function CartEditor() {
   }, [settings, previewOpen, postSettings]);
 
   const previewDoc = useMemo(
-    () => buildPreviewDoc(drawerCss, drawerJs),
-    [drawerCss, drawerJs],
+    () => buildPreviewDoc(drawerCss, drawerJs, shippingProtectionIcon),
+    [drawerCss, drawerJs, shippingProtectionIcon],
   );
 
   // The title badge reflects the last *saved* status, not the pending

@@ -57,9 +57,10 @@ export const DEFAULT_SETTINGS = {
   show_strikethrough: true,
   show_savings: true,
 
-  // Gift wrap
+  // Gift wrap (backed by a real Shopify product/variant)
   enable_gift_wrap: false,
   gift_wrap_label: "Wrap my order as a gift",
+  gift_wrap_placement: "before-upsells",
   // The real Shopify product/variant added to cart when checked — its own
   // price is what the customer is charged. Cached fields (title/image/price)
   // let the drawer show "+ $X" without a live lookup on every render.
@@ -68,6 +69,16 @@ export const DEFAULT_SETTINGS = {
   gift_wrap_product_title: "",
   gift_wrap_product_image: "",
   gift_wrap_price: 0, // cents, matches formatMoney()
+
+  // Shipping protection (a separate product-backed cart-footer add-on)
+  enable_shipping_protection: false,
+  shipping_protection_label: "Shipping protection",
+  shipping_protection_description: "Protect your order against loss and damage.",
+  shipping_protection_product_id: "",
+  shipping_protection_variant_id: "",
+  shipping_protection_product_title: "",
+  shipping_protection_product_image: "",
+  shipping_protection_price: 0,
 
   // Upsells
   show_upsells: true,

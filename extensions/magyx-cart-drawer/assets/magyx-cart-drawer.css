@@ -550,6 +550,108 @@ magyx-cart-trigger *::after {
   cursor: pointer;
 }
 
+.bc-shipping-protection {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.bc-shipping-protection-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  flex-shrink: 0;
+  transition: filter 0.2s ease, opacity 0.2s ease;
+}
+
+.bc-shipping-protection-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.bc-shipping-protection.is-disabled .bc-shipping-protection-icon {
+  filter: grayscale(1);
+  opacity: 0.52;
+}
+
+.bc-shipping-protection-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bc-shipping-protection-title {
+  color: var(--bc-text);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.bc-shipping-protection-price {
+  color: var(--bc-text);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.bc-shipping-protection-description {
+  color: var(--bc-text);
+  font-size: 12px;
+  line-height: 1.3;
+  opacity: 0.62;
+}
+
+.bc-shipping-protection-toggle {
+  appearance: none;
+  width: 40px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999px;
+  background-color: #d1d5db;
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.bc-shipping-protection-toggle::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 4px;
+  left: 4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.bc-shipping-protection-toggle:checked {
+  background-color: var(--bc-btn-bg);
+}
+
+.bc-shipping-protection-toggle:checked::after {
+  transform: translateX(16px);
+}
+
+.bc-shipping-protection-toggle:focus-visible {
+  outline: 2px solid var(--bc-btn-bg);
+  outline-offset: 2px;
+}
+
 .bc-trust-info {
   display: flex;
   flex-direction: column;

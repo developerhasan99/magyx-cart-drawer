@@ -549,6 +549,15 @@ export function GiftWrapTab({ settings, updateSetting }) {
           onChange={(value) => updateSetting("gift_wrap_label", value)}
           autoComplete="off"
         />
+        <Select
+          label="Placement"
+          options={[
+            { label: "Before upsells", value: "before-upsells" },
+            { label: "After upsells", value: "after-upsells" },
+          ]}
+          value={settings.gift_wrap_placement}
+          onChange={(value) => updateSetting("gift_wrap_placement", value)}
+        />
       </BlockStack>
 
       <Group title="Wrap product">
@@ -590,6 +599,108 @@ export function GiftWrapTab({ settings, updateSetting }) {
         ) : (
           <div>
             <Button onClick={pickWrapProduct}>Choose product</Button>
+          </div>
+        )}
+      </Group>
+    </Section>
+  );
+}
+
+export function ShippingProtectionTab({ settings, updateSetting }) {
+  const shopify = useAppBridge();
+
+  const pickProtectionProduct = useCallback(async () => {
+    const selection = await shopify.resourcePicker({
+      type: "product",
+      multiple: false,
+      action: "select",
+      filter: { draft: false, archived: false, variants: false },
+    });
+    const product = selection?.[0];
+    const variant = product?.variants?.[0];
+    if (!product || !variant) return;
+
+    updateSetting("shipping_protection_product_id", product.id);
+    updateSetting("shipping_protection_variant_id", variant.id);
+    updateSetting("shipping_protection_product_title", product.title);
+    updateSetting(
+      "shipping_protection_product_image",
+      product.images?.[0]?.originalSrc || "",
+    );
+    updateSetting(
+      "shipping_protection_price",
+      Math.round(parseFloat(variant.price || "0") * 100),
+    );
+  }, [shopify, updateSetting]);
+
+  return (
+    <Section
+      title="Shipping protection"
+      description="Offer optional delivery protection in the cart footer."
+    >
+      <BlockStack gap="300">
+        <Checkbox
+          label="Enable shipping protection"
+          checked={settings.enable_shipping_protection}
+          onChange={(value) =>
+            updateSetting("enable_shipping_protection", value)
+          }
+        />
+        <TextField
+          label="Add-on title"
+          value={settings.shipping_protection_label}
+          onChange={(value) =>
+            updateSetting("shipping_protection_label", value)
+          }
+          autoComplete="off"
+        />
+        <TextField
+          label="Description"
+          value={settings.shipping_protection_description}
+          onChange={(value) =>
+            updateSetting("shipping_protection_description", value)
+          }
+          autoComplete="off"
+        />
+      </BlockStack>
+
+      <Group title="Protection product">
+        <Text as="p" variant="bodyMd" tone="subdued">
+          Create a product for shipping protection and pick it here. Its real
+          price is charged when the customer enables protection. Consider
+          hiding it from storefront search so it appears only through the cart.
+        </Text>
+        {settings.shipping_protection_product_title ? (
+          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+            <InlineStack align="space-between" blockAlign="center" gap="300">
+              <InlineStack gap="300" blockAlign="center">
+                {settings.shipping_protection_product_image ? (
+                  <img
+                    src={settings.shipping_protection_product_image}
+                    alt=""
+                    style={{
+                      width: 40,
+                      height: 40,
+                      objectFit: "cover",
+                      borderRadius: 6,
+                    }}
+                  />
+                ) : null}
+                <BlockStack gap="0">
+                  <Text as="span" variant="bodyMd" fontWeight="medium">
+                    {settings.shipping_protection_product_title}
+                  </Text>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    {(settings.shipping_protection_price / 100).toFixed(2)}
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+              <Button onClick={pickProtectionProduct}>Change</Button>
+            </InlineStack>
+          </Box>
+        ) : (
+          <div>
+            <Button onClick={pickProtectionProduct}>Choose product</Button>
           </div>
         )}
       </Group>
