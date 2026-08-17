@@ -3,21 +3,21 @@ import {
   getPublishedCartConfig,
   parseSettings,
 } from "../models/cart-config.server";
+import { authenticate } from "../shopify.server";
 
 // Storefront-facing (via the app proxy at /apps/cart-drawer-settings).
 // Serves the one PUBLISHED cart config; `settings: null` tells the drawer
 // to stay inert rather than fall back to defaults, so unpublishing all
 // carts genuinely turns the drawer off.
 export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  const { session } = await authenticate.public.appProxy(request);
 
-  if (!shop) {
-    return data({ error: "Shop parameter required" }, { status: 400 });
+  if (!session) {
+    return data({ error: "App is not installed for this shop" }, { status: 403 });
   }
 
   try {
-    const config = await getPublishedCartConfig(shop);
+    const config = await getPublishedCartConfig(session.shop);
     if (!config) return data({ settings: null });
     // configId gives future storefront analytics a stable key to report on.
     return data({ configId: config.id, settings: parseSettings(config) });

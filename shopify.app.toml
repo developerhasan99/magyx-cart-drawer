@@ -13,7 +13,15 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,write_products,read_themes"
+scopes = "read_products,write_products,read_themes,write_app_proxy"
+
+# The theme app extension fetches the published cart configuration from this
+# storefront URL. Shopify signs the request and forwards it to the route
+# below, keeping the Railway URL private from storefront visitors.
+[app_proxy]
+url = "/api/proxy/settings"
+prefix = "apps"
+subpath = "cart-drawer-settings"
 
 [auth]
 redirect_urls = [ "https://magyx-cart-drawer-production.up.railway.app/api/auth" ]
