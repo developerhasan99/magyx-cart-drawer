@@ -16,6 +16,9 @@ export function parseSettings(config) {
   } catch (_error) {
     // Corrupt blob — fall back to defaults rather than crash the editor.
   }
+  // Publication is now the only live-state switch. Drop this retired setting
+  // from older saved carts so the next save cleans it out of the JSON blob.
+  delete saved.enable_cart_drawer;
   return { ...DEFAULT_SETTINGS, ...saved };
 }
 

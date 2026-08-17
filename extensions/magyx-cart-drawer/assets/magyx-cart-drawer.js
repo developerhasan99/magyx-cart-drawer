@@ -7,7 +7,6 @@
   const INTERNAL_FETCH_FLAG = "X-Magyx-Cart-Internal";
 
   const DEFAULTS = {
-    enableCartDrawer: true,
     autoOpenCart: true,
     showFloatingTrigger: true,
     floatingPosition: "bottom-right",
@@ -338,9 +337,9 @@
 
       await this.fetchSettings();
 
-      // No published cart, or the drawer disabled site-wide: stay inert so
-      // the theme's own cart keeps working untouched.
-      if (this.inert || !this.settings.enableCartDrawer) {
+      // No published cart: stay inert so the theme's own cart keeps working
+      // untouched. Publishing is the only app-level on/off control.
+      if (this.inert) {
         this.inert = true;
         return;
       }
@@ -413,10 +412,6 @@
       return {
         blockId: this.blockId,
         currentProductId: this.currentProductId,
-        enableCartDrawer: asBoolean(
-          apiSettings.enable_cart_drawer,
-          DEFAULTS.enableCartDrawer,
-        ),
         autoOpenCart: asBoolean(
           apiSettings.auto_open_cart,
           DEFAULTS.autoOpenCart,
@@ -743,7 +738,7 @@
 
       event.preventDefault();
       event.stopPropagation();
-      this.openCart(true);
+      this.openCart();
     }
 
     handleExternalMutation(event) {
@@ -874,7 +869,7 @@
     // ------------------------------------------------------------------
 
     handleOpenEvent() {
-      this.openCart(true);
+      this.openCart();
     }
 
     async handleCartSubmit(event) {
@@ -908,7 +903,7 @@
       if (action !== "toggle-gift-wrap") event.preventDefault();
 
       if (action === "open") {
-        this.openCart(true);
+        this.openCart();
       } else if (action === "close" || action === "continue-shopping") {
         this.closeCart();
       } else if (action === "remove-item") {
@@ -1191,7 +1186,7 @@
       });
     }
 
-    openCart(forceRefresh = false) {
+    openCart() {
       if (!this.isOpen) {
         this.previousBodyOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
@@ -1204,8 +1199,6 @@
           this.querySelector(".bc-drawer-close")?.focus();
         }, 0);
       }
-
-      if (forceRefresh && !this.isPreview) this.refreshCart({ loading: true });
     }
 
     closeCart() {
@@ -2078,7 +2071,7 @@
       event.preventDefault();
       const drawer = document.querySelector("magyx-cart-drawer");
       if (drawer && typeof drawer.openCart === "function" && !drawer.inert) {
-        drawer.openCart(true);
+        drawer.openCart();
         return;
       }
 

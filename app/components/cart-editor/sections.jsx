@@ -895,7 +895,7 @@ export function GeneralTab({ settings, updateSetting }) {
   return (
     <Section
       title="General"
-      description="Cart title and where the drawer appears on your site."
+      description="Cart title and storefront behavior."
     >
       <TextField
         label="Cart title"
@@ -906,11 +906,6 @@ export function GeneralTab({ settings, updateSetting }) {
 
       <Group title="Placement">
         <BlockStack gap="300">
-          <Checkbox
-            label="Enable cart drawer site-wide"
-            checked={settings.enable_cart_drawer}
-            onChange={(value) => updateSetting("enable_cart_drawer", value)}
-          />
           <Checkbox
             label="Auto open on add to cart"
             checked={settings.auto_open_cart}

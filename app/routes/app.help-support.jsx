@@ -57,9 +57,7 @@ export default function HelpSupport() {
                   </Text>
                   <Text as="p" variant="bodyMd" tone="subdued">
                     Make sure a cart is published here, the app embed is
-                    enabled in the theme editor, and the cart&apos;s Placement
-                    section has &quot;Enable cart drawer site-wide&quot;
-                    checked.
+                    enabled in the theme editor.
                   </Text>
                   <Text as="p" variant="bodyMd">
                     <strong>My theme&apos;s own cart drawer still opens.</strong>

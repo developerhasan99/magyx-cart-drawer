@@ -4,7 +4,6 @@
 // the blob is served as-is to the storefront via the app proxy.
 export const DEFAULT_SETTINGS = {
   // Placement
-  enable_cart_drawer: true,
   auto_open_cart: true,
   show_floating_trigger: true,
   floating_position: "bottom-right",
