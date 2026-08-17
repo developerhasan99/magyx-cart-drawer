@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- plain-JS codebase, no PropTypes in use */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useFetcher } from "react-router";
 import {
   BlockStack,
   Box,
@@ -772,6 +773,37 @@ export function SummaryTab({ settings, updateSetting }) {
 }
 
 export function BadgesTab({ settings, updateSetting }) {
+  const shopify = useAppBridge();
+  const fileFetcher = useFetcher();
+
+  const pickBadgeImage = useCallback(async () => {
+    if (!shopify.intents.invoke) {
+      shopify.toast.show("The Shopify Files picker is unavailable", {
+        isError: true,
+      });
+      return;
+    }
+
+    const activity = await shopify.intents.invoke("pick:shopify/File");
+    const response = await activity.complete;
+    const fileId = response?.code === "ok" ? response.data?.ids?.[0] : null;
+    if (!fileId) return;
+
+    fileFetcher.submit(
+      { intent: "resolve-trust-badge-file", fileId },
+      { method: "POST" },
+    );
+  }, [fileFetcher, shopify]);
+
+  useEffect(() => {
+    if (fileFetcher.state !== "idle" || !fileFetcher.data) return;
+    if (fileFetcher.data.url) {
+      updateSetting("trust_badge_image", fileFetcher.data.url);
+    } else if (fileFetcher.data.error) {
+      shopify.toast.show(fileFetcher.data.error, { isError: true });
+    }
+  }, [fileFetcher.data, fileFetcher.state, shopify, updateSetting]);
+
   return (
     <Section
       title="Trust badges"
@@ -784,12 +816,20 @@ export function BadgesTab({ settings, updateSetting }) {
           onChange={(value) => updateSetting("show_trust_badges", value)}
         />
         <TextField
-          label="Badge image URL"
+          label="Badge image"
           value={settings.trust_badge_image}
           onChange={(value) => updateSetting("trust_badge_image", value)}
-          helpText="A single image containing your badges works best."
+          helpText="Choose an image from Shopify Files, or paste an image URL."
           autoComplete="off"
         />
+        <div>
+          <Button
+            onClick={pickBadgeImage}
+            loading={fileFetcher.state !== "idle"}
+          >
+            Choose from Shopify Files
+          </Button>
+        </div>
         {settings.trust_badge_image ? (
           <Box
             padding="300"

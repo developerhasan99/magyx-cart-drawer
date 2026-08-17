@@ -149,9 +149,39 @@ export const loader = async ({ request, params }) => {
 };
 
 export const action = async ({ request, params }) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  if (intent === "resolve-trust-badge-file") {
+    const fileId = String(formData.get("fileId") ?? "");
+    if (!fileId) return { error: "Choose an image file first" };
+
+    const response = await admin.graphql(
+      `query TrustBadgeFile($id: ID!) {
+        node(id: $id) {
+          ... on MediaImage {
+            image { url }
+          }
+          ... on GenericFile {
+            url
+            mimeType
+          }
+        }
+      }`,
+      { variables: { id: fileId } },
+    );
+    const result = await response.json();
+    const file = result.data?.node;
+    const url = file?.image?.url ?? file?.url;
+
+    if (!url || (!file?.image && !String(file?.mimeType).startsWith("image/"))) {
+      return {
+        error: "Choose an image from Shopify Files",
+      };
+    }
+    return { url };
+  }
 
   if (intent === "save") {
     await updateCartConfig(session.shop, params.id, {

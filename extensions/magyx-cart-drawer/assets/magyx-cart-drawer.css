@@ -835,11 +835,11 @@ magyx-cart-trigger *::after {
   align-items: center;
   width: 100%;
   border: 1px dashed #d1d5db;
-  border-radius: 10px;
-  padding: 4px;
+  border-radius: 8px;
+  padding: 3px;
   background: #fff;
   transition: border-color 0.2s;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .bc-coupon-wrap:focus-within {
@@ -848,9 +848,9 @@ magyx-cart-trigger *::after {
 
 .bc-coupon-input {
   flex: 1;
-  height: 38px;
-  padding: 0 12px;
-  font-size: 14px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
   border: none;
   background: transparent;
   margin: 0;
@@ -861,8 +861,8 @@ magyx-cart-trigger *::after {
 }
 
 .bc-coupon-btn {
-  height: 38px;
-  padding: 0 16px;
+  height: 34px;
+  padding: 0 14px;
   font-size: 13px;
   font-weight: 600;
   border: none;
@@ -873,12 +873,13 @@ magyx-cart-trigger *::after {
   justify-content: center;
   transition: opacity 0.2s;
   flex-shrink: 0;
-  background-color: var(--bc-accent);
-  color: var(--bc-text);
+  background-color: var(--bc-btn-bg);
+  color: var(--bc-btn-text);
 }
 
 .bc-coupon-btn:hover {
-  opacity: 0.9;
+  background-color: var(--bc-btn-hover-bg);
+  color: var(--bc-btn-hover-text);
 }
 
 .bc-coupon-accordion {
@@ -1160,6 +1161,57 @@ magyx-cart-trigger *::after {
 
 .magyx-cart-count-bubble[hidden] {
   display: none;
+}
+
+/* Give primary drawer actions the same tactile depth as Polaris buttons:
+   raised at rest, a little more lift on hover, and a pressed-in response. */
+.bc-upsell-add,
+.bc-empty-cart-btn,
+.bc-coupon-btn,
+.bc-checkout-btn {
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 2px 0 rgba(0, 0, 0, 0.2),
+    0 3px 6px rgba(0, 0, 0, 0.12);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.bc-upsell-add:hover:not(:disabled),
+.bc-empty-cart-btn:hover,
+.bc-coupon-btn:hover,
+.bc-checkout-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 3px 0 rgba(0, 0, 0, 0.2),
+    0 5px 10px rgba(0, 0, 0, 0.14);
+}
+
+.bc-upsell-add:active:not(:disabled),
+.bc-empty-cart-btn:active,
+.bc-coupon-btn:active,
+.bc-checkout-btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.16),
+    0 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+.bc-upsell-add:focus-visible,
+.bc-empty-cart-btn:focus-visible,
+.bc-coupon-btn:focus-visible,
+.bc-checkout-btn:focus-visible {
+  outline: 2px solid var(--bc-btn-bg);
+  outline-offset: 2px;
+}
+
+.bc-upsell-add:disabled {
+  box-shadow: none;
 }
 
 @keyframes bc-spin {

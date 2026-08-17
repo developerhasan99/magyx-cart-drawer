@@ -1978,7 +1978,7 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
             </span>
           </button>
-          <div class="bc-coupon-accordion-content" style="max-height: ${this.couponOpen ? "92px" : "0"};">
+          <div class="bc-coupon-accordion-content" style="max-height: ${this.couponOpen ? "76px" : "0"};">
             <div class="bc-coupon-wrap">
               <input type="text" placeholder="${escapeHtml(this.settings.transCouponPlaceholder)}" class="bc-coupon-input" autocomplete="off">
               <button type="button" class="bc-coupon-btn" data-magyx-action="apply-coupon">${escapeHtml(this.settings.transCouponApplyBtn)}</button>
