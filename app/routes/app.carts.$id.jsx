@@ -201,7 +201,7 @@ const EDITOR_NAV = [
   {
     title: "Footer",
     items: [
-      { id: "discount", label: "Discount", icon: DiscountCodeIcon, Component: DiscountTab },
+      { id: "discount", label: "Coupon form", icon: DiscountCodeIcon, Component: DiscountTab },
       { id: "summary", label: "Cart summary", icon: ReceiptIcon, Component: SummaryTab },
       { id: "badges", label: "Trust badges", icon: ShieldCheckMarkIcon, Component: BadgesTab },
     ],

@@ -82,6 +82,9 @@ export const DEFAULT_SETTINGS = {
   enable_coupon: true,
 
   // Summary
+  // Static keeps the footer in the cart's scroll region. Merchants can opt
+  // into Fixed when they want checkout controls visible at all times.
+  footer_position: "static",
   enable_subtotal_line: true,
   enable_total_line: true,
   show_shipping_notice: true,

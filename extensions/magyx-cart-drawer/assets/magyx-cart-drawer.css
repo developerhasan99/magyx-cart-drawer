@@ -40,6 +40,7 @@ magyx-cart-trigger *::after {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease-in-out;
+  display: block !important;
 }
 
 .bc-drawer-wrap.is-open .bc-overlay {
@@ -813,6 +814,12 @@ magyx-cart-trigger *::after {
   background-color: var(--bc-bg);
 }
 
+/* Static footers live inside the scroll region, so they follow the cart's
+   content instead of being held at the base of the drawer. */
+.bc-cart-contents-scroll .bc-drawer-footer {
+  margin-top: 0;
+}
+
 .bc-cart-error {
   border: 1px solid #fecaca;
   background: #fef2f2;
@@ -1219,4 +1226,3 @@ magyx-cart-trigger *::after {
     animation: none;
   }
 }
-

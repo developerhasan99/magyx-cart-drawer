@@ -54,6 +54,7 @@
     savingsTextColor: "#2ea818",
     savingsPrefix: "Save",
     enableCoupon: true,
+    footerPosition: "static",
     enableSubtotalLine: true,
     enableTotalLine: true,
     showShippingNotice: true,
@@ -560,6 +561,10 @@
         enableCoupon: asBoolean(
           apiSettings.enable_coupon,
           DEFAULTS.enableCoupon,
+        ),
+        footerPosition: asText(
+          apiSettings.footer_position,
+          DEFAULTS.footerPosition,
         ),
         enableSubtotalLine: asBoolean(
           apiSettings.enable_subtotal_line,
@@ -1488,14 +1493,14 @@
 
       const markup = this.isCartEmpty() ? "" : this.renderFooter(this.cart);
       const existingFooter = container.querySelector(".bc-drawer-footer");
-      if (existingFooter) {
-        if (markup) {
-          existingFooter.outerHTML = markup;
-        } else {
-          existingFooter.remove();
-        }
-      } else if (markup) {
-        container.insertAdjacentHTML("beforeend", markup);
+      if (existingFooter) existingFooter.remove();
+
+      if (markup) {
+        const staticFooter = this.settings.footerPosition !== "fixed";
+        const target = staticFooter
+          ? container.querySelector(".bc-cart-contents-scroll")
+          : container;
+        target?.insertAdjacentHTML("beforeend", markup);
       }
 
       if (couponState) {

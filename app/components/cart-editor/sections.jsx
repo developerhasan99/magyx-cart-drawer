@@ -651,7 +651,7 @@ export function UpsellsTab({ settings, updateSetting }) {
 export function DiscountTab({ settings, updateSetting }) {
   return (
     <Section
-      title="Discount"
+      title="Coupon form"
       description="Let customers apply a coupon code without leaving the drawer."
     >
       <BlockStack gap="300">
@@ -696,6 +696,16 @@ export function SummaryTab({ settings, updateSetting }) {
       description="Totals, notices, and the checkout button at the bottom of the drawer."
     >
       <BlockStack gap="300">
+        <Select
+          label="Cart footer position"
+          options={[
+            { label: "Static — scroll with cart", value: "static" },
+            { label: "Fixed — always visible", value: "fixed" },
+          ]}
+          value={settings.footer_position}
+          onChange={(value) => updateSetting("footer_position", value)}
+          helpText="Static is the default."
+        />
         <Checkbox
           label="Show subtotal line"
           checked={settings.enable_subtotal_line}
