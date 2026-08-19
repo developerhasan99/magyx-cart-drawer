@@ -822,6 +822,7 @@ export function SummaryTab({ settings, updateSetting }) {
           label="Show subtotal line"
           checked={settings.enable_subtotal_line}
           onChange={(value) => updateSetting("enable_subtotal_line", value)}
+          helpText="Shown only when the subtotal differs from the total."
         />
         <Checkbox
           label="Show total line"

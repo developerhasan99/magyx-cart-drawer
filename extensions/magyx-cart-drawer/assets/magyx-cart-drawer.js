@@ -68,7 +68,8 @@
     giftWrapPrice: 0,
     enableShippingProtection: false,
     shippingProtectionLabel: "Shipping protection",
-    shippingProtectionDescription: "Protect your order against loss and damage.",
+    shippingProtectionDescription:
+      "Protect your order against loss and damage.",
     shippingProtectionProductId: "",
     shippingProtectionVariantId: "",
     shippingProtectionProductTitle: "",
@@ -115,6 +116,14 @@
     return value === undefined || value === null || value === ""
       ? fallback
       : value;
+  }
+
+  // Admin resource pickers return GraphQL GIDs, while Shopify's AJAX cart
+  // endpoints and cart line items use the numeric legacy IDs.
+  function storefrontId(value, fallback = "") {
+    const raw = String(asText(value, fallback)).trim();
+    const gidMatch = raw.match(/\/(\d+)$/);
+    return gidMatch ? gidMatch[1] : raw;
   }
 
   function escapeHtml(value) {
@@ -190,9 +199,12 @@
             headers.get(INTERNAL_FETCH_FLAG)));
       const result = originalFetch.apply(this, arguments);
       if (!isInternal && CART_MUTATION_PATTERN.test(String(url))) {
-        result.then((response) => {
-          if (response.ok) announce(url);
-        }, () => {});
+        result.then(
+          (response) => {
+            if (response.ok) announce(url);
+          },
+          () => {},
+        );
       }
       return result;
     };
@@ -301,6 +313,7 @@
       this.timerInterval = null;
       this.recommendations = [];
       this.recommendationsSignature = "";
+      this.pendingScrollTop = null;
       this.previousBodyOverflow = "";
       this.settings = { ...DEFAULTS };
       this.isPreview = false;
@@ -361,6 +374,10 @@
       }
       this.renderShell();
 
+      // The cart snapshot renders synchronously above; start loading upsells
+      // immediately rather than waiting for a later cart operation.
+      this.loadRecommendations();
+
       this.addEventListener("click", this.handleClick);
       this.addEventListener("change", this.handleChange);
       document.addEventListener("keydown", this.handleKeydown);
@@ -374,17 +391,8 @@
 
       document.body.classList.add("magyx-cart-intercepting");
       installCartWatcher();
-      // The drawer shell starts with no cart data. Keep its loading overlay
-      // visible until the first cart response arrives, then render the
-      // contents and footer from that authoritative response.
-      this.refreshCart({ loading: true });
     }
 
-    /**
-     * The theme block embeds Shopify's cart JSON in the initial HTML. Using
-     * that response lets a cart with items render its body and footer before
-     * the follow-up cart.js request completes.
-     */
     readBootstrapCart() {
       const source = this.querySelector("[data-magyx-cart-bootstrap]");
       if (!source?.textContent) return null;
@@ -624,11 +632,11 @@
           apiSettings.gift_wrap_placement,
           DEFAULTS.giftWrapPlacement,
         ),
-        giftWrapProductId: asText(
+        giftWrapProductId: storefrontId(
           apiSettings.gift_wrap_product_id,
           DEFAULTS.giftWrapProductId,
         ),
-        giftWrapVariantId: asText(
+        giftWrapVariantId: storefrontId(
           apiSettings.gift_wrap_variant_id,
           DEFAULTS.giftWrapVariantId,
         ),
@@ -656,11 +664,11 @@
           apiSettings.shipping_protection_description,
           DEFAULTS.shippingProtectionDescription,
         ),
-        shippingProtectionProductId: asText(
+        shippingProtectionProductId: storefrontId(
           apiSettings.shipping_protection_product_id,
           DEFAULTS.shippingProtectionProductId,
         ),
-        shippingProtectionVariantId: asText(
+        shippingProtectionVariantId: storefrontId(
           apiSettings.shipping_protection_variant_id,
           DEFAULTS.shippingProtectionVariantId,
         ),
@@ -1452,6 +1460,7 @@
         this.recommendations = [];
         this.recommendationsSignature = "";
         this.updateBody();
+        this.updateFooter();
         return;
       }
 
@@ -1460,6 +1469,7 @@
         this.recommendations = [];
         this.recommendationsSignature = "";
         this.updateBody();
+        this.updateFooter();
         return;
       }
 
@@ -1489,9 +1499,11 @@
           .filter((product) => !cartProductIds.has(Number(product.id)))
           .slice(0, this.settings.upsellMax);
         this.updateBody();
+        this.updateFooter();
       } catch (_error) {
         this.recommendations = [];
         this.updateBody();
+        this.updateFooter();
       }
     }
 
@@ -1588,7 +1600,10 @@
       const cart = this.cart || { item_count: 0, items: [] };
       const isEmpty = this.isCartEmpty();
       const previousScroll =
-        container.querySelector(".bc-cart-contents-scroll")?.scrollTop || 0;
+        this.pendingScrollTop ??
+        container.querySelector(".bc-cart-contents-scroll")?.scrollTop ??
+        0;
+      this.pendingScrollTop = previousScroll;
 
       // Product-backed extras are rendered in their own controls rather than
       // duplicated as ordinary cart line-item cards.
@@ -1656,6 +1671,15 @@
           ? container.querySelector(".bc-cart-contents-scroll")
           : container;
         target?.insertAdjacentHTML("beforeend", markup);
+      }
+
+      // A static footer lives inside the scroll region. Restore the position
+      // only after it has been reattached, otherwise the browser may clamp
+      // the scroll range and jump the drawer back to the top.
+      const scroll = container.querySelector(".bc-cart-contents-scroll");
+      if (scroll && this.pendingScrollTop !== null) {
+        scroll.scrollTop = this.pendingScrollTop;
+        this.pendingScrollTop = null;
       }
 
       if (couponState) {
@@ -1803,7 +1827,8 @@
       if (!settings.enableGiftWrap || !settings.giftWrapVariantId) return "";
 
       const isWrapped = (this.cart?.items || []).some(
-        (item) => String(item.variant_id) === String(settings.giftWrapVariantId),
+        (item) =>
+          String(item.variant_id) === String(settings.giftWrapVariantId),
       );
 
       return `
@@ -1833,7 +1858,8 @@
 
       const isProtected = (this.cart?.items || []).some(
         (item) =>
-          String(item.variant_id) === String(settings.shippingProtectionVariantId),
+          String(item.variant_id) ===
+          String(settings.shippingProtectionVariantId),
       );
 
       return `
@@ -2068,23 +2094,35 @@
     renderFooter(cart) {
       const settings = this.settings;
       const discountCodes = this.discountCodes();
+      const subtotal = Number(
+        cart.original_total_price ?? cart.items_subtotal_price ?? 0,
+      );
+      const total = Number(cart.total_price ?? 0);
+      const showSubtotal = settings.enableSubtotalLine && subtotal !== total;
+      const hasDiscount = Number(cart.total_discount || 0) > 0;
+      const totalIsStandalone = !showSubtotal && !hasDiscount;
+      const footerOptions = [
+        this.renderShippingProtection(),
+        settings.enableCoupon ? this.renderCoupon() : "",
+      ]
+        .filter(Boolean)
+        .join("");
 
       return `
         <div class="bc-drawer-footer">
           ${this.error ? `<div class="bc-cart-error" role="alert">${escapeHtml(this.error)}</div>` : ""}
-          ${this.renderShippingProtection()}
-          ${settings.enableCoupon ? this.renderCoupon() : ""}
+          ${footerOptions ? `<div class="bc-footer-options">${footerOptions}</div>` : ""}
           <div class="bc-summary-block">
             ${
-              settings.enableSubtotalLine
+              showSubtotal
                 ? `<div class="bc-summary-row">
                     <span>${escapeHtml(settings.transSubtotal)}</span>
-                    <span class="val-wrap">${this.formatMoney(cart.items_subtotal_price || cart.original_total_price || 0)}</span>
+                    <span class="val-wrap">${this.formatMoney(subtotal)}</span>
                   </div>`
                 : ""
             }
             ${
-              Number(cart.total_discount || 0) > 0
+              hasDiscount
                 ? `<div class="bc-summary-row">
                     <div class="label-wrap">
                       <span>${escapeHtml(settings.transDiscounts)}:</span>
@@ -2096,7 +2134,7 @@
             }
             ${
               settings.enableTotalLine
-                ? `<div class="bc-summary-row bc-total-row">
+                ? `<div class="bc-summary-row bc-total-row${totalIsStandalone ? " is-standalone" : ""}">
                     <span>${escapeHtml(settings.transTotal)}</span>
                     <span class="val-wrap">${this.formatMoney(cart.total_price || 0)}</span>
                   </div>`
@@ -2322,4 +2360,8 @@
   if (!customElements.get("magyx-cart-trigger")) {
     customElements.define("magyx-cart-trigger", MagyxCartTrigger);
   }
+
+  // Increment this after every storefront runtime edit so deployed assets can
+  // be verified from the browser console.
+  console.log("[Magyx Cart] Edit version: 10");
 })();
