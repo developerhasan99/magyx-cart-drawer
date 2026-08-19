@@ -314,6 +314,7 @@
       this.recommendations = [];
       this.recommendationsSignature = "";
       this.pendingScrollTop = null;
+      this.removingOrphanedShippingProtection = false;
       this.previousBodyOverflow = "";
       this.settings = { ...DEFAULTS };
       this.isPreview = false;
@@ -370,9 +371,10 @@
       const bootstrapCart = this.readBootstrapCart();
       if (bootstrapCart) {
         this.cart = bootstrapCart;
-        this.count = Number(bootstrapCart.item_count || 0);
+        this.count = this.displayCartCount(bootstrapCart);
       }
       this.renderShell();
+      this.updateThemeCartCount();
 
       // The cart snapshot renders synchronously above; start loading upsells
       // immediately rather than waiting for a later cart operation.
@@ -391,6 +393,7 @@
 
       document.body.classList.add("magyx-cart-intercepting");
       installCartWatcher();
+      this.removeOrphanedShippingProtection();
     }
 
     readBootstrapCart() {
@@ -910,12 +913,69 @@
 
     receiveCart(cart) {
       this.cart = cart;
-      this.count = Number(cart?.item_count || 0);
+      this.count = this.displayCartCount(cart);
       this.error = "";
       this.updateContents();
       this.updateThemeCartCount();
       this.emitCartUpdated();
       this.loadRecommendations();
+      this.removeOrphanedShippingProtection();
+    }
+
+    hasProtectableCartItem(cart = this.cart) {
+      const addOnVariantIds = new Set(
+        [
+          this.settings.giftWrapVariantId,
+          this.settings.shippingProtectionVariantId,
+        ]
+          .filter(Boolean)
+          .map(String),
+      );
+      return (cart?.items || []).some(
+        (item) => !addOnVariantIds.has(String(item.variant_id)),
+      );
+    }
+
+    /** Shipping protection is a fee, not a product the cart badge counts. */
+    displayCartCount(cart = this.cart) {
+      const protectionVariantId = this.settings.shippingProtectionVariantId;
+      if (!Array.isArray(cart?.items)) return Number(cart?.item_count || 0);
+
+      return cart.items.reduce((count, item) => {
+        if (String(item.variant_id) === String(protectionVariantId)) {
+          return count;
+        }
+        return count + Number(item.quantity || 0);
+      }, 0);
+    }
+
+    removeOrphanedShippingProtection() {
+      const variantId = this.settings.shippingProtectionVariantId;
+      const protectionLine = (this.cart?.items || []).find(
+        (item) => String(item.variant_id) === String(variantId),
+      );
+      if (
+        this.isPreview ||
+        !this.settings.enableShippingProtection ||
+        !variantId ||
+        !protectionLine ||
+        this.hasProtectableCartItem() ||
+        this.removingOrphanedShippingProtection
+      ) {
+        return;
+      }
+
+      this.removingOrphanedShippingProtection = true;
+      this.enqueueMutation(async () => {
+        const cart = await this.postJson("cart/change.js", {
+          id: protectionLine.key,
+          quantity: 0,
+        });
+        this.refreshSequence++;
+        this.receiveCart(cart);
+      }).finally(() => {
+        this.removingOrphanedShippingProtection = false;
+      });
     }
 
     /** Keep a theme's native header cart bubble in sync with drawer actions. */
@@ -1083,7 +1143,7 @@
           ? message.products
           : [];
         this.cart = buildPreviewCart(this.previewProducts.slice(0, 2));
-        this.count = this.cart.item_count;
+        this.count = this.displayCartCount(this.cart);
       }
 
       this.recommendations = this.previewRecommendations();
@@ -1116,7 +1176,7 @@
             return item.quantity > 0;
           });
           this.cart = recalculatePreviewCart({ ...this.cart, items });
-          this.count = this.cart.item_count;
+          this.count = this.displayCartCount(this.cart);
           // Removing an item frees it back up as a recommendation.
           this.recommendations = this.previewRecommendations();
           this.updateContents();
@@ -1225,7 +1285,7 @@
           if (product) {
             this.cart.items.push(previewCartItem(product, 1));
             this.cart = recalculatePreviewCart(this.cart);
-            this.count = this.cart.item_count;
+            this.count = this.displayCartCount(this.cart);
             this.recommendations = this.previewRecommendations();
             this.updateContents();
           }
@@ -1272,7 +1332,7 @@
             );
           }
           this.cart = recalculatePreviewCart(this.cart);
-          this.count = this.cart.item_count;
+          this.count = this.displayCartCount(this.cart);
           this.updateContents();
           return;
         }
@@ -1298,7 +1358,9 @@
 
     toggleShippingProtection(checked) {
       const variantId = this.settings.shippingProtectionVariantId;
-      if (!variantId) return Promise.resolve();
+      if (!variantId || (checked && !this.hasProtectableCartItem())) {
+        return Promise.resolve();
+      }
 
       return this.enqueueMutation(async () => {
         if (this.isPreview) {
@@ -1325,7 +1387,7 @@
             );
           }
           this.cart = recalculatePreviewCart(this.cart);
-          this.count = this.cart.item_count;
+          this.count = this.displayCartCount(this.cart);
           this.updateContents();
           return;
         }
@@ -1851,7 +1913,8 @@
       const settings = this.settings;
       if (
         !settings.enableShippingProtection ||
-        !settings.shippingProtectionVariantId
+        !settings.shippingProtectionVariantId ||
+        !this.hasProtectableCartItem()
       ) {
         return "";
       }
@@ -2290,7 +2353,11 @@
         });
         if (!response.ok) return;
         const cart = await response.json();
-        this.count = Number(cart.item_count || 0);
+        const drawer = document.querySelector("magyx-cart-drawer");
+        this.count =
+          drawer && typeof drawer.displayCartCount === "function"
+            ? drawer.displayCartCount(cart)
+            : Number(cart.item_count || 0);
         this.updateCount();
       } catch (_error) {
         // The drawer remains usable if a theme blocks the count request.
@@ -2363,5 +2430,5 @@
 
   // Increment this after every storefront runtime edit so deployed assets can
   // be verified from the browser console.
-  console.log("[Magyx Cart] Edit version: 10");
+  console.log("[Magyx Cart] Edit version: 12");
 })();
