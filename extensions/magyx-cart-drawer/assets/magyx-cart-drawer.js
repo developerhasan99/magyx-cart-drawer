@@ -354,6 +354,11 @@
       }
 
       this.timerCount = Math.max(1, this.settings.timerDuration) * 60;
+      const bootstrapCart = this.readBootstrapCart();
+      if (bootstrapCart) {
+        this.cart = bootstrapCart;
+        this.count = Number(bootstrapCart.item_count || 0);
+      }
       this.renderShell();
 
       this.addEventListener("click", this.handleClick);
@@ -369,7 +374,28 @@
 
       document.body.classList.add("magyx-cart-intercepting");
       installCartWatcher();
-      this.refreshCart();
+      // The drawer shell starts with no cart data. Keep its loading overlay
+      // visible until the first cart response arrives, then render the
+      // contents and footer from that authoritative response.
+      this.refreshCart({ loading: true });
+    }
+
+    /**
+     * The theme block embeds Shopify's cart JSON in the initial HTML. Using
+     * that response lets a cart with items render its body and footer before
+     * the follow-up cart.js request completes.
+     */
+    readBootstrapCart() {
+      const source = this.querySelector("[data-magyx-cart-bootstrap]");
+      if (!source?.textContent) return null;
+
+      try {
+        const cart = JSON.parse(source.textContent);
+        return Array.isArray(cart?.items) ? cart : null;
+      } catch (error) {
+        console.warn("Magyx Cart: Invalid bootstrap cart data", error);
+        return null;
+      }
     }
 
     disconnectedCallback() {
@@ -879,8 +905,32 @@
       this.count = Number(cart?.item_count || 0);
       this.error = "";
       this.updateContents();
+      this.updateThemeCartCount();
       this.emitCartUpdated();
       this.loadRecommendations();
+    }
+
+    /** Keep a theme's native header cart bubble in sync with drawer actions. */
+    updateThemeCartCount() {
+      document.querySelectorAll(".cart-count-bubble").forEach((bubble) => {
+        const countNode =
+          bubble.querySelector('[aria-hidden="true"]') ||
+          bubble.querySelector("span:not(.visually-hidden):not(.sr-only)");
+        if (countNode) countNode.textContent = String(this.count);
+
+        // Preserve each theme's existing localized screen-reader wording and
+        // only replace its leading numeric count (for example, "2 items").
+        bubble
+          .querySelectorAll(".visually-hidden, .sr-only")
+          .forEach((label) => {
+            label.textContent = label.textContent.replace(
+              /^\s*\d+/,
+              String(this.count),
+            );
+          });
+
+        bubble.hidden = !(this.count > 0);
+      });
     }
 
     emitCartUpdated() {

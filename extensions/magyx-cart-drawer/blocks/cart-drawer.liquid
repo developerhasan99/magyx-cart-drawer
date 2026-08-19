@@ -12,7 +12,14 @@
   data-script-src="{{ 'magyx-cart-drawer.js' | asset_url }}"
   data-shipping-protection-icon-src="{{ 'shipping-protection.png' | asset_url }}"
   data-current-product-id="{{ current_product_id }}"
-  data-shop-domain="{{ shop_domain }}"></magyx-cart-drawer>
+  data-shop-domain="{{ shop_domain }}">
+  {%- comment -%}
+    Seed the drawer with the cart Shopify rendered for this page. The runtime
+    still refreshes cart.js after startup, but this prevents an occupied cart
+    from briefly being rendered as empty while that request is in flight.
+  {%- endcomment -%}
+  <script type="application/json" data-magyx-cart-bootstrap>{{ cart | json }}</script>
+</magyx-cart-drawer>
 
 {% schema %}
 {
