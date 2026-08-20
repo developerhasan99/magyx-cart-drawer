@@ -145,6 +145,14 @@
     return String(name).replace(/^_+/, "").replace(/[_-]+/g, " ");
   }
 
+  /** Prefixes a path with the shop's root route so carts on localized or
+   * subfolder storefronts hit the right endpoints. */
+  function shopifyRoute(path) {
+    const root = window.Shopify?.routes?.root || "/";
+    const normalizedRoot = root.endsWith("/") ? root : `${root}/`;
+    return `${normalizedRoot}${String(path).replace(/^\//, "")}`;
+  }
+
   function iconSvg(name, className = "") {
     const iconClass = escapeHtml(className);
     const icons = {
@@ -316,6 +324,7 @@
       this.pendingScrollTop = null;
       this.removingOrphanedShippingProtection = false;
       this.previousBodyOverflow = "";
+      this.lastFocusedElement = null;
       this.settings = { ...DEFAULTS };
       this.isPreview = false;
       this.previewProducts = [];
@@ -362,10 +371,7 @@
 
       // No published cart: stay inert so the theme's own cart keeps working
       // untouched. Publishing is the only app-level on/off control.
-      if (this.inert) {
-        this.inert = true;
-        return;
-      }
+      if (this.inert) return;
 
       this.timerCount = Math.max(1, this.settings.timerDuration) * 60;
       const bootstrapCart = this.readBootstrapCart();
@@ -383,7 +389,10 @@
       this.addEventListener("click", this.handleClick);
       this.addEventListener("change", this.handleChange);
       document.addEventListener("keydown", this.handleKeydown);
-      document.addEventListener("submit", this.handleCartSubmit, true);
+      // Bubble phase, deliberately: the theme's own submit handlers run
+      // first, so handleCartSubmit can tell whether the theme already took
+      // over the add (defaultPrevented) and only act as a fallback.
+      document.addEventListener("submit", this.handleCartSubmit);
       document.addEventListener("click", this.handleDocumentClick, true);
       window.addEventListener(OPEN_CART_EVENT, this.handleOpenEvent);
       window.addEventListener(
@@ -413,7 +422,7 @@
       this.removeEventListener("click", this.handleClick);
       this.removeEventListener("change", this.handleChange);
       document.removeEventListener("keydown", this.handleKeydown);
-      document.removeEventListener("submit", this.handleCartSubmit, true);
+      document.removeEventListener("submit", this.handleCartSubmit);
       document.removeEventListener("click", this.handleDocumentClick, true);
       window.removeEventListener(OPEN_CART_EVENT, this.handleOpenEvent);
       window.removeEventListener(
@@ -836,9 +845,7 @@
     // ------------------------------------------------------------------
 
     route(path) {
-      const root = window.Shopify?.routes?.root || "/";
-      const normalizedRoot = root.endsWith("/") ? root : `${root}/`;
-      return `${normalizedRoot}${String(path).replace(/^\//, "")}`;
+      return shopifyRoute(path);
     }
 
     async fetchJson(path, options = {}) {
@@ -1044,7 +1051,14 @@
       const action = form.getAttribute("action") || "";
       if (!action.includes("/cart/add") && !action.endsWith("cart/add")) return;
       if (form.dataset.magyxCartIgnore === "true") return;
+      // The theme already converted this submit into its own AJAX add (this
+      // listener runs in the bubble phase, after the theme's handlers). The
+      // request watcher will see that request and refresh/open the drawer,
+      // so adding here again would double the product.
+      if (event.defaultPrevented) return;
 
+      // No theme handler claimed the submit — it would be a full-page
+      // navigation to /cart. Take it over and add via AJAX instead.
       event.preventDefault();
       await this.addFromForm(form, event.submitter);
     }
@@ -1113,6 +1127,11 @@
     handleKeydown(event) {
       if (event.key === "Escape" && this.isOpen) {
         this.closeCart();
+        return;
+      }
+
+      if (event.key === "Tab" && this.isOpen && !this.isPreview) {
+        this.trapFocus(event);
         return;
       }
 
@@ -1411,8 +1430,41 @@
       });
     }
 
+    /** Keeps Tab cycling inside the open dialog — aria-modal alone doesn't
+     * stop the browser from tabbing into the page behind the overlay. */
+    trapFocus(event) {
+      const panel = this.querySelector(".bc-drawer-panel");
+      if (!panel) return;
+
+      const focusable = Array.from(
+        panel.querySelectorAll(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.offsetParent !== null);
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      const outside = !panel.contains(active);
+
+      if (event.shiftKey) {
+        if (active === first || outside) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || outside) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
     openCart() {
       if (!this.isOpen) {
+        this.lastFocusedElement =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
         this.previousBodyOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
         this.isOpen = true;
@@ -1432,6 +1484,8 @@
       this.isOpen = false;
       document.body.style.overflow = this.previousBodyOverflow;
       this.querySelector(".bc-drawer-wrap")?.classList.remove("is-open");
+      if (this.lastFocusedElement?.isConnected) this.lastFocusedElement.focus();
+      this.lastFocusedElement = null;
     }
 
     startTimer() {
@@ -1563,6 +1617,9 @@
         this.updateBody();
         this.updateFooter();
       } catch (_error) {
+        // Clear the signature so the next cart change retries instead of
+        // being short-circuited by the check above.
+        this.recommendationsSignature = "";
         this.recommendations = [];
         this.updateBody();
         this.updateFooter();
@@ -1597,11 +1654,20 @@
 
     renderShell() {
       const settings = this.settings;
+      const fontFamily = settings.inheritFonts
+        ? "inherit"
+        : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+      // Merchant CSS must stay CSS — a literal "</style>" would end the tag
+      // and turn the rest into live markup.
+      const customCss = String(settings.customCss || "").replace(
+        /<\/style/gi,
+        "",
+      );
 
       this.innerHTML = `
-        ${settings.customCss ? `<style>${settings.customCss}</style>` : ""}
+        ${customCss ? `<style>${customCss}</style>` : ""}
         ${settings.showFloatingTrigger ? this.renderFloatingTrigger() : ""}
-        <div class="bc-drawer-wrap ${this.isOpen ? "is-open" : ""}" style="${this.cssVars()}; font-family: ${settings.inheritFonts ? "inherit" : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'};">
+        <div class="bc-drawer-wrap ${this.isOpen ? "is-open" : ""}" style="${escapeHtml(`${this.cssVars()}; font-family: ${fontFamily};`)}">
           <div class="bc-overlay" data-magyx-action="close"></div>
           <aside class="bc-drawer-panel" role="dialog" aria-modal="true" aria-label="${escapeHtml(settings.cartTitle)}">
             <div class="bc-drawer-header">
@@ -1767,7 +1833,7 @@
           class="magyx-cart-floating-trigger ${settings.floatingPosition === "bottom-left" ? "is-left" : "is-right"}"
           data-magyx-action="open"
           aria-label="Open cart"
-          style="${this.cssVars()}"
+          style="${escapeHtml(this.cssVars())}"
         >
           ${iconSvg(settings.cartIconType, "magyx-cart-icon-svg")}
           ${settings.showCartCount ? `<span class="magyx-cart-count-bubble" ${this.count > 0 ? "" : "hidden"}>${this.count}</span>` : ""}
@@ -1786,7 +1852,7 @@
 
       return `
         <div class="bc-drawer-top-notices">
-          <div class="bc-announcement size-${escapeHtml(settings.announcementSize)}" style="background-color: ${settings.announcementBg}; color: ${settings.announcementTextColor};">
+          <div class="bc-announcement size-${escapeHtml(settings.announcementSize)}" style="${escapeHtml(`background-color: ${settings.announcementBg}; color: ${settings.announcementTextColor};`)}">
             ${text}
           </div>
         </div>
@@ -1838,8 +1904,8 @@
         <div class="bc-rewards-bars-wrap">
           <div class="bc-progress-wrap">
             <div class="bc-progress-text">${progressText}</div>
-            <div class="bc-progress-bar" style="background-color: ${settings.rewardsBarBg}; margin-bottom: 24px;">
-              <div class="bc-progress-fill" style="width: ${progress}%; background-color: ${settings.rewardsBarFg};"></div>
+            <div class="bc-progress-bar" style="${escapeHtml(`background-color: ${settings.rewardsBarBg}; margin-bottom: 24px;`)}">
+              <div class="bc-progress-fill" style="${escapeHtml(`width: ${progress}%; background-color: ${settings.rewardsBarFg};`)}"></div>
               <div class="bc-checkpoints">
                 ${goals
                   .map((goal) => {
@@ -1849,9 +1915,13 @@
                       100,
                     );
                     return `
-                      <div class="bc-checkpoint ${reached ? "is-reached" : ""}" style="left: ${position}%; background-color: ${
-                        reached ? settings.rewardsBarFg : settings.rewardsBarBg
-                      }; color: ${reached ? settings.rewardsCompleteIconColor : settings.rewardsIncompleteIconColor};">
+                      <div class="bc-checkpoint ${reached ? "is-reached" : ""}" style="${escapeHtml(
+                        `left: ${position}%; background-color: ${
+                          reached
+                            ? settings.rewardsBarFg
+                            : settings.rewardsBarBg
+                        }; color: ${reached ? settings.rewardsCompleteIconColor : settings.rewardsIncompleteIconColor};`,
+                      )}">
                         ${iconSvg(goal.icon, "bc-checkpoint-icon")}
                         <div class="bc-checkpoint-label">${escapeHtml(goal.label)}</div>
                       </div>
@@ -2340,9 +2410,7 @@
     }
 
     route(path) {
-      const root = window.Shopify?.routes?.root || "/";
-      const normalizedRoot = root.endsWith("/") ? root : `${root}/`;
-      return `${normalizedRoot}${String(path).replace(/^\//, "")}`;
+      return shopifyRoute(path);
     }
 
     async refreshCount() {
@@ -2408,7 +2476,7 @@
       if (!this.settings) return;
 
       this.innerHTML = `
-        <button type="button" class="magyx-cart-icon-wrapper bc-icon-trigger" aria-label="${escapeHtml(this.settings.label)}" style="${this.cssVars()}">
+        <button type="button" class="magyx-cart-icon-wrapper bc-icon-trigger" aria-label="${escapeHtml(this.settings.label)}" style="${escapeHtml(this.cssVars())}">
           ${iconSvg(this.settings.cartIconType, "magyx-cart-icon-svg")}
           ${
             this.settings.showCartCount
@@ -2430,5 +2498,5 @@
 
   // Increment this after every storefront runtime edit so deployed assets can
   // be verified from the browser console.
-  console.log("[Magyx Cart] Edit version: 12");
+  console.log("[Magyx Cart] Edit version: 15");
 })();

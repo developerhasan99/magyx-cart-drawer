@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db.server";
 import { DEFAULT_SETTINGS } from "../settings/defaults";
 
@@ -91,16 +92,22 @@ export async function deleteCartConfig(shop, id) {
 export async function publishCartConfig(shop, id) {
   const existing = await prisma.cartConfig.findFirst({ where: { id, shop } });
   if (!existing) throw new Response("Cart not found", { status: 404 });
-  return prisma.$transaction(async (tx) => {
-    await tx.cartConfig.updateMany({
-      where: { shop, status: CART_STATUS.PUBLISHED, id: { not: id } },
-      data: { status: CART_STATUS.DRAFT },
-    });
-    return tx.cartConfig.update({
-      where: { id },
-      data: { status: CART_STATUS.PUBLISHED },
-    });
-  });
+  // Serializable, because under read-committed two concurrent publishes can
+  // each demote the other's not-yet-published row and then both promote,
+  // leaving two PUBLISHED configs.
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.cartConfig.updateMany({
+        where: { shop, status: CART_STATUS.PUBLISHED, id: { not: id } },
+        data: { status: CART_STATUS.DRAFT },
+      });
+      return tx.cartConfig.update({
+        where: { id },
+        data: { status: CART_STATUS.PUBLISHED },
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 }
 
 export async function unpublishCartConfig(shop, id) {
