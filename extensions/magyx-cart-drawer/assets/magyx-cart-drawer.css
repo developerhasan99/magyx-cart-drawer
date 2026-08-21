@@ -16,6 +16,13 @@ magyx-cart-trigger {
   display: none !important;
 }
 
+/* Scroll lock while the drawer is open. A class rather than an inline style,
+   so closing the drawer can never "restore" a stale overflow value that a
+   theme script set on the body. */
+body.magyx-cart-open {
+  overflow: hidden !important;
+}
+
 magyx-cart-drawer *,
 magyx-cart-drawer *::before,
 magyx-cart-drawer *::after,

@@ -153,6 +153,76 @@
     return `${normalizedRoot}${String(path).replace(/^\//, "")}`;
   }
 
+  /** Class names theme scripts commonly put on <html>/<body> to freeze page
+   * scroll for their own drawers. Only touched while scroll is verifiably
+   * stuck (see releaseThemeScrollLocks). */
+  const THEME_SCROLL_LOCK_CLASSES = [
+    "overflow-hidden",
+    "overflow-hidden-mobile",
+    "overflow-hidden-tablet",
+    "js-drawer-open",
+    "js-drawer-open-right",
+    "js-drawer-open-left",
+    "drawer-open",
+    "drawer-opened",
+    "cart-open",
+    "cart-drawer-open",
+    "no-scroll",
+    "noscroll",
+    "scroll-lock",
+    "scroll-locked",
+    "lock-scroll",
+  ];
+
+  function isScrollLocked() {
+    const bodyStyle = window.getComputedStyle(document.body);
+    const htmlStyle = window.getComputedStyle(document.documentElement);
+    return (
+      bodyStyle.overflow === "hidden" ||
+      bodyStyle.overflowY === "hidden" ||
+      htmlStyle.overflow === "hidden" ||
+      htmlStyle.overflowY === "hidden" ||
+      bodyStyle.position === "fixed"
+    );
+  }
+
+  /**
+   * The interception CSS hides theme cart drawers, so a scroll lock a theme
+   * script set for its own drawer belongs to UI nobody can see or close.
+   * Escalates through the common lock mechanisms — inline overflow, the
+   * fixed-body iOS pattern, then known lock classes — rechecking after each
+   * step so a page that already scrolls is never touched.
+   */
+  function releaseThemeScrollLocks() {
+    if (!isScrollLocked()) return;
+
+    [document.documentElement, document.body].forEach((element) => {
+      if (element.style.overflow === "hidden") element.style.overflow = "";
+      if (element.style.overflowY === "hidden") element.style.overflowY = "";
+    });
+
+    if (document.body.style.position === "fixed") {
+      const top = parseInt(document.body.style.top || "0", 10);
+      document.body.style.position = "";
+      document.body.style.top = "";
+      if (top < 0) window.scrollTo(0, -top);
+    }
+
+    if (!isScrollLocked()) return;
+
+    [document.documentElement, document.body].forEach((element) => {
+      THEME_SCROLL_LOCK_CLASSES.forEach((name) => {
+        element.classList.remove(name);
+      });
+    });
+
+    if (isScrollLocked()) {
+      console.warn(
+        "[Magyx Cart] Page scroll is still locked by the theme after cleanup.",
+      );
+    }
+  }
+
   function iconSvg(name, className = "") {
     const iconClass = escapeHtml(className);
     const icons = {
@@ -323,7 +393,6 @@
       this.recommendationsSignature = "";
       this.pendingScrollTop = null;
       this.removingOrphanedShippingProtection = false;
-      this.previousBodyOverflow = "";
       this.lastFocusedElement = null;
       this.settings = { ...DEFAULTS };
       this.isPreview = false;
@@ -431,8 +500,8 @@
       );
       window.removeEventListener("message", this.handlePreviewMessage);
       document.body.classList.remove("magyx-cart-intercepting");
+      document.body.classList.remove("magyx-cart-open");
       this.stopTimer();
-      if (this.isOpen) document.body.style.overflow = this.previousBodyOverflow;
     }
 
     async fetchSettings() {
@@ -1465,8 +1534,7 @@
           document.activeElement instanceof HTMLElement
             ? document.activeElement
             : null;
-        this.previousBodyOverflow = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
+        document.body.classList.add("magyx-cart-open");
         this.isOpen = true;
         // The class toggle (not a rebuild) is what lets the CSS slide-in
         // transition actually play.
@@ -1482,7 +1550,14 @@
       if (this.isPreview) return; // The admin preview drawer stays open.
       if (!this.isOpen) return;
       this.isOpen = false;
-      document.body.style.overflow = this.previousBodyOverflow;
+      document.body.classList.remove("magyx-cart-open");
+      releaseThemeScrollLocks();
+      // Second sweep for themes that lock scroll asynchronously (after
+      // their own cart fetch settles) — but never while the drawer has
+      // been reopened in the meantime.
+      window.setTimeout(() => {
+        if (!this.isOpen) releaseThemeScrollLocks();
+      }, 400);
       this.querySelector(".bc-drawer-wrap")?.classList.remove("is-open");
       if (this.lastFocusedElement?.isConnected) this.lastFocusedElement.focus();
       this.lastFocusedElement = null;
@@ -2498,5 +2573,5 @@
 
   // Increment this after every storefront runtime edit so deployed assets can
   // be verified from the browser console.
-  console.log("[Magyx Cart] Edit version: 15");
+  console.log("[Magyx Cart] Edit version: 17");
 })();
