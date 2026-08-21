@@ -405,7 +405,7 @@
       this.refreshSequence = 0;
 
       this.handleClick = this.handleClick.bind(this);
-      this.handleChange = this.handleChange.bind(this);
+      this.handleUpsellsScroll = this.handleUpsellsScroll.bind(this);
       this.handleKeydown = this.handleKeydown.bind(this);
       this.handleCartSubmit = this.handleCartSubmit.bind(this);
       this.handleOpenEvent = this.handleOpenEvent.bind(this);
@@ -430,7 +430,9 @@
         this.timerCount = Math.max(1, this.settings.timerDuration) * 60;
         window.addEventListener("message", this.handlePreviewMessage);
         this.addEventListener("click", this.handleClick);
-        this.addEventListener("change", this.handleChange);
+        // Capture phase: "scroll" doesn't bubble, but capturing listeners on
+        // an ancestor still see it during the capture pass to the target.
+        this.addEventListener("scroll", this.handleUpsellsScroll, true);
         this.renderShell();
         this.openCart();
         return;
@@ -456,7 +458,7 @@
       this.loadRecommendations();
 
       this.addEventListener("click", this.handleClick);
-      this.addEventListener("change", this.handleChange);
+      this.addEventListener("scroll", this.handleUpsellsScroll, true);
       document.addEventListener("keydown", this.handleKeydown);
       // Bubble phase, deliberately: the theme's own submit handlers run
       // first, so handleCartSubmit can tell whether the theme already took
@@ -489,7 +491,7 @@
 
     disconnectedCallback() {
       this.removeEventListener("click", this.handleClick);
-      this.removeEventListener("change", this.handleChange);
+      this.removeEventListener("scroll", this.handleUpsellsScroll, true);
       document.removeEventListener("keydown", this.handleKeydown);
       document.removeEventListener("submit", this.handleCartSubmit);
       document.removeEventListener("click", this.handleDocumentClick, true);
@@ -1175,6 +1177,10 @@
         await this.removeCoupon(control.dataset.code || "");
       } else if (action === "add-upsell") {
         await this.addUpsell(control);
+      } else if (action === "upsell-prev") {
+        this.scrollUpsells(-1);
+      } else if (action === "upsell-next") {
+        this.scrollUpsells(1);
       } else if (action === "toggle-gift-wrap") {
         await this.toggleGiftWrap(control.checked);
       } else if (action === "toggle-shipping-protection") {
@@ -1182,15 +1188,40 @@
       }
     }
 
-    handleChange(event) {
-      const select = event.target.closest(".bc-upsell-select");
-      if (!select || !this.contains(select)) return;
+    /** Scrolls the upsell carousel by one card width so repeated clicks land
+     * on consecutive snap points instead of an arbitrary distance. */
+    scrollUpsells(direction) {
+      const list = this.querySelector(".bc-upsells-list");
+      const card = list?.querySelector(".bc-upsell-item");
+      if (!list || !card) return;
 
-      const option = select.selectedOptions[0];
-      const price = option?.dataset.price;
-      const item = select.closest(".bc-upsell-item");
-      const priceEl = item?.querySelector(".bc-upsell-price");
-      if (price && priceEl) priceEl.textContent = price;
+      const gap = parseFloat(getComputedStyle(list).columnGap || "0") || 0;
+      const amount = (card.getBoundingClientRect().width + gap) * direction;
+      list.scrollBy({ left: amount, behavior: "smooth" });
+    }
+
+    handleUpsellsScroll(event) {
+      if (!event.target?.classList?.contains("bc-upsells-list")) return;
+      this.updateUpsellsNav(event.target);
+    }
+
+    /** Enables/disables the carousel arrows based on scroll position, and
+     * hides the nav entirely once every card already fits on screen. */
+    updateUpsellsNav(list = this.querySelector(".bc-upsells-list")) {
+      const nav = this.querySelector(".bc-upsells-nav");
+      if (!list || !nav) return;
+
+      const maxScroll = list.scrollWidth - list.clientWidth;
+      if (maxScroll <= 1) {
+        nav.hidden = true;
+        return;
+      }
+      nav.hidden = false;
+
+      const prevBtn = nav.querySelector('[data-magyx-action="upsell-prev"]');
+      const nextBtn = nav.querySelector('[data-magyx-action="upsell-next"]');
+      if (prevBtn) prevBtn.disabled = list.scrollLeft <= 1;
+      if (nextBtn) nextBtn.disabled = list.scrollLeft >= maxScroll - 1;
     }
 
     handleKeydown(event) {
@@ -1844,6 +1875,7 @@
       }
       const newScroll = container.querySelector(".bc-cart-contents-scroll");
       if (newScroll) newScroll.scrollTop = previousScroll;
+      this.updateUpsellsNav();
     }
 
     /** The footer re-renders on every cart change, so the coupon input's
@@ -2218,12 +2250,30 @@
 
       return `
         <div class="bc-upsells">
-          <h3 class="bc-upsells-title">${escapeHtml(settings.upsellTitle)}</h3>
+          <div class="bc-upsells-header">
+            <h3 class="bc-upsells-title">${escapeHtml(settings.upsellTitle)}</h3>
+            <div class="bc-upsells-nav" hidden>
+              <button type="button" class="bc-upsells-nav-btn" data-magyx-action="upsell-prev" aria-label="Previous products" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+              </button>
+              <button type="button" class="bc-upsells-nav-btn" data-magyx-action="upsell-next" aria-label="Next products">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              </button>
+            </div>
+          </div>
           <div class="bc-upsells-list">
             ${this.recommendations.map((product) => this.renderUpsell(product)).join("")}
           </div>
         </div>
       `;
+    }
+
+    /** The variant/price picker shows "{option} - {price}" per the design —
+     * a single control communicates both, so there's no separate price row
+     * on the card. */
+    upsellOptionText(variant) {
+      const label = variant.public_title || variant.title || "Default";
+      return `${label} - ${this.formatMoney(variant.price)}`;
     }
 
     renderUpsell(product) {
@@ -2238,11 +2288,6 @@
           product.images?.[0] ||
           selectedVariant?.featured_image?.src,
       );
-      const price =
-        selectedVariant?.price ?? product.price_min ?? product.price;
-      const compareAtPrice =
-        selectedVariant?.compare_at_price ?? product.compare_at_price;
-      const hasCompareAt = Number(compareAtPrice || 0) > Number(price || 0);
 
       return `
         <div class="bc-upsell-item">
@@ -2255,10 +2300,6 @@
             <h5 class="bc-upsell-title">
               <a href="${escapeHtml(productUrl)}">${escapeHtml(product.title)}</a>
             </h5>
-            <div class="bc-upsell-prices">
-              ${hasCompareAt ? `<span class="bc-upsell-old-price">${this.formatMoney(compareAtPrice)}</span>` : ""}
-              <span class="bc-upsell-price">${this.formatMoney(price)}</span>
-            </div>
             <div class="bc-upsell-actions">
               ${
                 variants.length > 1
@@ -2266,10 +2307,6 @@
                       <select class="bc-upsell-select" aria-label="Choose ${escapeHtml(product.title)} variant">
                         ${variants
                           .map((variant) => {
-                            const label =
-                              variant.public_title ||
-                              variant.title ||
-                              "Default";
                             const disabled = variant.available
                               ? ""
                               : "disabled";
@@ -2278,7 +2315,7 @@
                               variant.id === selectedVariant.id
                                 ? "selected"
                                 : "";
-                            return `<option value="${variant.id}" data-price="${this.formatMoney(variant.price)}" ${selected} ${disabled}>${escapeHtml(label)}</option>`;
+                            return `<option value="${variant.id}" ${selected} ${disabled}>${escapeHtml(this.upsellOptionText(variant))}</option>`;
                           })
                           .join("")}
                       </select>
@@ -2286,7 +2323,9 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
                       </span>
                     </div>`
-                  : ""
+                  : selectedVariant
+                    ? `<div class="bc-upsell-static">${escapeHtml(this.upsellOptionText(selectedVariant))}</div>`
+                    : ""
               }
               <button type="button" class="bc-upsell-add" data-magyx-action="add-upsell" data-variant-id="${selectedVariant?.id || ""}" ${
                 selectedVariant ? "" : "disabled"
@@ -2573,5 +2612,5 @@
 
   // Increment this after every storefront runtime edit so deployed assets can
   // be verified from the browser console.
-  console.log("[Magyx Cart] Edit version: 17");
+  console.log("[Magyx Cart] Edit version: 20");
 })();
