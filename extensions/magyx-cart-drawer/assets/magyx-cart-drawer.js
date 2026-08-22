@@ -392,7 +392,7 @@
       this.recommendations = [];
       this.recommendationsSignature = "";
       this.pendingScrollTop = null;
-      this.removingOrphanedShippingProtection = false;
+      this.removingOrphanedAddOns = false;
       this.lastFocusedElement = null;
       this.settings = { ...DEFAULTS };
       this.isPreview = false;
@@ -473,7 +473,7 @@
 
       document.body.classList.add("magyx-cart-intercepting");
       installCartWatcher();
-      this.removeOrphanedShippingProtection();
+      this.removeOrphanedAddOns();
     }
 
     readBootstrapCart() {
@@ -997,11 +997,13 @@
       this.updateThemeCartCount();
       this.emitCartUpdated();
       this.loadRecommendations();
-      this.removeOrphanedShippingProtection();
+      this.removeOrphanedAddOns();
     }
 
-    hasProtectableCartItem(cart = this.cart) {
-      const addOnVariantIds = new Set(
+    /** Variant IDs for product-backed extras (gift wrap, shipping protection)
+     * that ride along as cart lines but aren't regular products. */
+    addOnVariantIds() {
+      return new Set(
         [
           this.settings.giftWrapVariantId,
           this.settings.shippingProtectionVariantId,
@@ -1009,50 +1011,84 @@
           .filter(Boolean)
           .map(String),
       );
-      return (cart?.items || []).some(
+    }
+
+    /** Product IDs backing those same add-ons — excluded from upsell
+     * recommendations so they never surface as a suggested add-to-cart. */
+    addOnProductIds() {
+      return new Set(
+        [
+          this.settings.giftWrapProductId,
+          this.settings.shippingProtectionProductId,
+        ]
+          .filter(Boolean)
+          .map(String),
+      );
+    }
+
+    /** Cart items excluding add-ons — what counts as "regular products" for
+     * offers, recommendations, and reward-goal progress. */
+    regularCartItems(cart = this.cart) {
+      const addOnVariantIds = this.addOnVariantIds();
+      return (cart?.items || []).filter(
         (item) => !addOnVariantIds.has(String(item.variant_id)),
       );
     }
 
-    /** Shipping protection is a fee, not a product the cart badge counts. */
-    displayCartCount(cart = this.cart) {
-      const protectionVariantId = this.settings.shippingProtectionVariantId;
-      if (!Array.isArray(cart?.items)) return Number(cart?.item_count || 0);
-
-      return cart.items.reduce((count, item) => {
-        if (String(item.variant_id) === String(protectionVariantId)) {
-          return count;
-        }
-        return count + Number(item.quantity || 0);
-      }, 0);
+    hasProtectableCartItem(cart = this.cart) {
+      return this.regularCartItems(cart).length > 0;
     }
 
-    removeOrphanedShippingProtection() {
-      const variantId = this.settings.shippingProtectionVariantId;
-      const protectionLine = (this.cart?.items || []).find(
-        (item) => String(item.variant_id) === String(variantId),
+    /** Add-ons (gift wrap, shipping protection) are fees, not products the
+     * cart badge counts. */
+    displayCartCount(cart = this.cart) {
+      if (!Array.isArray(cart?.items)) return Number(cart?.item_count || 0);
+      return this.regularCartItems(cart).reduce(
+        (count, item) => count + Number(item.quantity || 0),
+        0,
       );
+    }
+
+    /** Add-ons never stand alone — if every regular product has been
+     * removed, drop any enabled add-on lines still sitting in the cart. */
+    removeOrphanedAddOns() {
       if (
         this.isPreview ||
-        !this.settings.enableShippingProtection ||
-        !variantId ||
-        !protectionLine ||
-        this.hasProtectableCartItem() ||
-        this.removingOrphanedShippingProtection
+        this.removingOrphanedAddOns ||
+        this.hasProtectableCartItem()
       ) {
         return;
       }
 
-      this.removingOrphanedShippingProtection = true;
+      const orphanedLines = (this.cart?.items || []).filter((item) => {
+        const variantId = String(item.variant_id);
+        if (
+          this.settings.enableShippingProtection &&
+          variantId === String(this.settings.shippingProtectionVariantId)
+        ) {
+          return true;
+        }
+        if (
+          this.settings.enableGiftWrap &&
+          variantId === String(this.settings.giftWrapVariantId)
+        ) {
+          return true;
+        }
+        return false;
+      });
+      if (!orphanedLines.length) return;
+
+      this.removingOrphanedAddOns = true;
       this.enqueueMutation(async () => {
-        const cart = await this.postJson("cart/change.js", {
-          id: protectionLine.key,
-          quantity: 0,
+        const cart = await this.postJson("cart/update.js", {
+          updates: Object.fromEntries(
+            orphanedLines.map((item) => [item.key, 0]),
+          ),
         });
         this.refreshSequence++;
         this.receiveCart(cart);
       }).finally(() => {
-        this.removingOrphanedShippingProtection = false;
+        this.removingOrphanedAddOns = false;
       });
     }
 
@@ -1424,7 +1460,9 @@
      * shows as this one toggle row, not a duplicate line card. */
     toggleGiftWrap(checked) {
       const variantId = this.settings.giftWrapVariantId;
-      if (!variantId) return Promise.resolve();
+      if (!variantId || (checked && !this.hasProtectableCartItem())) {
+        return Promise.resolve();
+      }
 
       return this.enqueueMutation(async () => {
         if (this.isPreview) {
@@ -1669,7 +1707,7 @@
     }
 
     getRecommendationAnchorProductId() {
-      const firstCartItem = this.cart?.items?.[0];
+      const firstCartItem = this.regularCartItems()[0];
       return firstCartItem?.product_id || this.settings.currentProductId || "";
     }
 
@@ -1696,7 +1734,7 @@
       }
 
       const cartProductIds = new Set(
-        (this.cart.items || []).map((item) => Number(item.product_id)),
+        this.regularCartItems().map((item) => Number(item.product_id)),
       );
       const signature = [
         productId,
@@ -1717,8 +1755,10 @@
         const response = await this.fetchJson(
           `recommendations/products.json?${params.toString()}`,
         );
+        const addOnProductIds = this.addOnProductIds();
         this.recommendations = (response.products || [])
           .filter((product) => !cartProductIds.has(Number(product.id)))
+          .filter((product) => !addOnProductIds.has(String(product.id)))
           .slice(0, this.settings.upsellMax);
         this.updateBody();
         this.updateFooter();
@@ -1841,17 +1881,7 @@
 
       // Product-backed extras are rendered in their own controls rather than
       // duplicated as ordinary cart line-item cards.
-      const addOnVariantIds = new Set(
-        [
-          this.settings.giftWrapVariantId,
-          this.settings.shippingProtectionVariantId,
-        ]
-          .filter(Boolean)
-          .map(String),
-      );
-      const visibleItems = (cart.items || []).filter(
-        (item) => !addOnVariantIds.has(String(item.variant_id)),
-      );
+      const visibleItems = this.regularCartItems(cart);
       const giftWrapAfterUpsells =
         this.settings.giftWrapPlacement === "after-upsells";
 
@@ -1992,10 +2022,17 @@
 
       if (!goals.length) return "";
 
+      // Shipping protection is a fee, not a product — it doesn't earn
+      // progress toward spend/quantity reward goals.
+      const regularItems = this.regularCartItems(cart);
       const currentValue =
         settings.rewardType === "quantity"
-          ? Number(cart.item_count || 0)
-          : Number(cart.items_subtotal_price || 0) / 100;
+          ? regularItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+          : regularItems.reduce(
+              (sum, item) =>
+                sum + Number(item.final_price || 0) * Number(item.quantity || 0),
+              0,
+            ) / 100;
       const maxThreshold = goals[goals.length - 1].threshold;
       const progress = Math.min((currentValue / maxThreshold) * 100, 100);
       const nextGoal = goals.find((goal) => currentValue < goal.threshold);
@@ -2612,5 +2649,5 @@
 
   // Increment this after every storefront runtime edit so deployed assets can
   // be verified from the browser console.
-  console.log("[Magyx Cart] Edit version: 20");
+  console.log("[Magyx Cart] Edit version: 23");
 })();

@@ -64,7 +64,7 @@ const EXTENSION_ASSETS = path.join(
 /** A handful of real, active, in-stock products so the preview drawer shows
  * the merchant's own catalog instead of placeholder items. Best-effort: an
  * empty list just leaves the preview cart empty, never breaks the editor. */
-async function fetchPreviewProducts(admin) {
+async function fetchPreviewProducts(admin, excludeProductIds) {
   try {
     const response = await admin.graphql(
       `#graphql
@@ -92,6 +92,7 @@ async function fetchPreviewProducts(admin) {
     const nodes = json?.data?.products?.nodes ?? [];
 
     return nodes
+      .filter((product) => !excludeProductIds.has(product.id))
       .map((product) => {
         const variant = product.variants.nodes[0];
         if (!variant || !variant.availableForSale) return null;
@@ -128,6 +129,15 @@ export const loader = async ({ request, params }) => {
   const config = await getCartConfig(session.shop, params.id);
   if (!config) throw new Response("Cart not found", { status: 404 });
 
+  const settings = parseSettings(config);
+  // Add-on products (gift wrap, shipping protection) are fees, not products
+  // — never let the preview offer them up as an upsell.
+  const excludeProductIds = new Set(
+    [settings.gift_wrap_product_id, settings.shipping_protection_product_id].filter(
+      Boolean,
+    ),
+  );
+
   // The preview iframe runs the real storefront drawer, so the editor ships
   // the extension's own CSS/JS inline — one source of truth, no copies.
   const [drawerCss, drawerJs, shippingProtectionIcon, previewProducts] = await Promise.all([
@@ -136,7 +146,7 @@ export const loader = async ({ request, params }) => {
     readFile(path.join(EXTENSION_ASSETS, "shipping-protection.png")).then(
       (image) => `data:image/png;base64,${image.toString("base64")}`,
     ),
-    fetchPreviewProducts(admin),
+    fetchPreviewProducts(admin, excludeProductIds),
   ]);
 
   return {
@@ -145,7 +155,7 @@ export const loader = async ({ request, params }) => {
       id: config.id,
       name: config.name,
       status: config.status,
-      settings: parseSettings(config),
+      settings,
     },
     drawerCss,
     drawerJs,
