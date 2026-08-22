@@ -168,6 +168,37 @@ export const loader = async ({ request, params }) => {
   };
 };
 
+// Applied to the gift wrap / shipping protection linked products on every
+// save so merchants can build a discount-collection rule ("tag is not
+// magyx-addon") that keeps promos like Buy X Get Y from applying to them.
+const ADDON_TAG = "magyx-addon";
+
+/** Best-effort: tagging failures shouldn't block saving the cart config. */
+async function tagAddOnProducts(admin, settings) {
+  const productIds = [
+    settings?.gift_wrap_product_id,
+    settings?.shipping_protection_product_id,
+  ].filter(Boolean);
+
+  await Promise.all(
+    productIds.map(async (id) => {
+      try {
+        await admin.graphql(
+          `#graphql
+          mutation MagyxTagAddOnProduct($id: ID!, $tags: [String!]!) {
+            tagsAdd(id: $id, tags: $tags) {
+              userErrors { message }
+            }
+          }`,
+          { variables: { id, tags: [ADDON_TAG] } },
+        );
+      } catch (error) {
+        console.error(`Magyx Cart: failed to tag add-on product ${id}:`, error);
+      }
+    }),
+  );
+}
+
 export const action = async ({ request, params }) => {
   const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
@@ -204,10 +235,12 @@ export const action = async ({ request, params }) => {
   }
 
   if (intent === "save") {
+    const settings = JSON.parse(String(formData.get("settings") ?? "{}"));
     await updateCartConfig(session.shop, params.id, {
       name: String(formData.get("name") ?? ""),
-      settings: JSON.parse(String(formData.get("settings") ?? "{}")),
+      settings,
     });
+    await tagAddOnProducts(admin, settings);
     // Status rides along with the same Save action — see CartEditor: a
     // single global Save button owns every pending change, publish state
     // included, rather than the sidebar's status control writing straight

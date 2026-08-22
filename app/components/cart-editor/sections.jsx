@@ -18,6 +18,7 @@ import {
   hsbToHex,
   rgbToHsb,
 } from "@shopify/polaris";
+import { EditIcon } from "@shopify/polaris-icons";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import "./sections.css";
 
@@ -58,6 +59,54 @@ function TwoColumns({ children }) {
     <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
       {children}
     </InlineGrid>
+  );
+}
+
+/** Opens Shopify's own native product editor (the same one merchants use
+ * from the Products list) via App Bridge admin intents, instead of us
+ * rebuilding a copy of it. Resolves once the merchant closes it. */
+async function openProductEditor(shopify, productId) {
+  if (!productId) return;
+  if (!shopify.intents?.invoke) {
+    shopify.toast.show("The product editor is unavailable", { isError: true });
+    return;
+  }
+  const activity = await shopify.intents.invoke("edit:shopify/Product", {
+    value: productId,
+  });
+  await activity.complete;
+}
+
+/** Shared "pick a product for this add-on" card: image, title, price, plus
+ * Change and edit-product actions. Used by gift wrap and shipping
+ * protection, which both link a real product the same way. */
+function ProductPickerCard({ title, price, image, onChange, onEdit }) {
+  return (
+    <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+      <InlineStack align="space-between" blockAlign="center" gap="300">
+        <InlineStack gap="300" blockAlign="center">
+          {image ? (
+            <img
+              src={image}
+              alt=""
+              style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }}
+            />
+          ) : null}
+          <BlockStack gap="0">
+            <Text as="span" variant="bodyMd" fontWeight="medium">
+              {title}
+            </Text>
+            <Text as="span" variant="bodySm" tone="subdued">
+              {(price / 100).toFixed(2)}
+            </Text>
+          </BlockStack>
+        </InlineStack>
+        <InlineStack gap="200" blockAlign="center">
+          <Button icon={EditIcon} accessibilityLabel="Edit product" onClick={onEdit} />
+          <Button onClick={onChange}>Change</Button>
+        </InlineStack>
+      </InlineStack>
+    </Box>
   );
 }
 
@@ -569,33 +618,13 @@ export function GiftWrapTab({ settings, updateSetting }) {
           only ever appears through the cart.
         </Text>
         {settings.gift_wrap_product_title ? (
-          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-            <InlineStack align="space-between" blockAlign="center" gap="300">
-              <InlineStack gap="300" blockAlign="center">
-                {settings.gift_wrap_product_image ? (
-                  <img
-                    src={settings.gift_wrap_product_image}
-                    alt=""
-                    style={{
-                      width: 40,
-                      height: 40,
-                      objectFit: "cover",
-                      borderRadius: 6,
-                    }}
-                  />
-                ) : null}
-                <BlockStack gap="0">
-                  <Text as="span" variant="bodyMd" fontWeight="medium">
-                    {settings.gift_wrap_product_title}
-                  </Text>
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    {(settings.gift_wrap_price / 100).toFixed(2)}
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-              <Button onClick={pickWrapProduct}>Change</Button>
-            </InlineStack>
-          </Box>
+          <ProductPickerCard
+            title={settings.gift_wrap_product_title}
+            price={settings.gift_wrap_price}
+            image={settings.gift_wrap_product_image}
+            onChange={pickWrapProduct}
+            onEdit={() => openProductEditor(shopify, settings.gift_wrap_product_id)}
+          />
         ) : (
           <div>
             <Button onClick={pickWrapProduct}>Choose product</Button>
@@ -671,33 +700,15 @@ export function ShippingProtectionTab({ settings, updateSetting }) {
           hiding it from storefront search so it appears only through the cart.
         </Text>
         {settings.shipping_protection_product_title ? (
-          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-            <InlineStack align="space-between" blockAlign="center" gap="300">
-              <InlineStack gap="300" blockAlign="center">
-                {settings.shipping_protection_product_image ? (
-                  <img
-                    src={settings.shipping_protection_product_image}
-                    alt=""
-                    style={{
-                      width: 40,
-                      height: 40,
-                      objectFit: "cover",
-                      borderRadius: 6,
-                    }}
-                  />
-                ) : null}
-                <BlockStack gap="0">
-                  <Text as="span" variant="bodyMd" fontWeight="medium">
-                    {settings.shipping_protection_product_title}
-                  </Text>
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    {(settings.shipping_protection_price / 100).toFixed(2)}
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-              <Button onClick={pickProtectionProduct}>Change</Button>
-            </InlineStack>
-          </Box>
+          <ProductPickerCard
+            title={settings.shipping_protection_product_title}
+            price={settings.shipping_protection_price}
+            image={settings.shipping_protection_product_image}
+            onChange={pickProtectionProduct}
+            onEdit={() =>
+              openProductEditor(shopify, settings.shipping_protection_product_id)
+            }
+          />
         ) : (
           <div>
             <Button onClick={pickProtectionProduct}>Choose product</Button>
