@@ -140,14 +140,18 @@ export const loader = async ({ request, params }) => {
 
   // The preview iframe runs the real storefront drawer, so the editor ships
   // the extension's own CSS/JS inline — one source of truth, no copies.
-  const [drawerCss, drawerJs, shippingProtectionIcon, previewProducts] = await Promise.all([
-    readFile(path.join(EXTENSION_ASSETS, "magyx-cart-drawer.css"), "utf8"),
-    readFile(path.join(EXTENSION_ASSETS, "magyx-cart-drawer.js"), "utf8"),
-    readFile(path.join(EXTENSION_ASSETS, "shipping-protection.png")).then(
-      (image) => `data:image/png;base64,${image.toString("base64")}`,
-    ),
-    fetchPreviewProducts(admin, excludeProductIds),
-  ]);
+  const [drawerCss, drawerJs, shippingProtectionIcon, giftWrapIcon, previewProducts] =
+    await Promise.all([
+      readFile(path.join(EXTENSION_ASSETS, "magyx-cart-drawer.css"), "utf8"),
+      readFile(path.join(EXTENSION_ASSETS, "magyx-cart-drawer.js"), "utf8"),
+      readFile(path.join(EXTENSION_ASSETS, "shipping-protection.png")).then(
+        (image) => `data:image/png;base64,${image.toString("base64")}`,
+      ),
+      readFile(path.join(EXTENSION_ASSETS, "gift-wrap.svg")).then(
+        (svg) => `data:image/svg+xml;base64,${svg.toString("base64")}`,
+      ),
+      fetchPreviewProducts(admin, excludeProductIds),
+    ]);
 
   return {
     previewProducts,
@@ -160,6 +164,7 @@ export const loader = async ({ request, params }) => {
     drawerCss,
     drawerJs,
     shippingProtectionIcon,
+    giftWrapIcon,
   };
 };
 
@@ -269,7 +274,7 @@ const EDITOR_SECTIONS = EDITOR_NAV.flatMap((group) => group.items);
 /** The preview page is self-contained (srcDoc): extension CSS + JS inlined,
  * drawer element in preview mode. Settings arrive via postMessage so typing
  * in the editor updates the preview without reloading the frame. */
-function buildPreviewDoc(drawerCss, drawerJs, shippingProtectionIcon) {
+function buildPreviewDoc(drawerCss, drawerJs, shippingProtectionIcon, giftWrapIcon) {
   return `<!doctype html>
 <html>
 <head>
@@ -281,14 +286,14 @@ function buildPreviewDoc(drawerCss, drawerJs, shippingProtectionIcon) {
 </style>
 </head>
 <body>
-<magyx-cart-drawer data-preview="true" data-shipping-protection-icon-src="${shippingProtectionIcon}"></magyx-cart-drawer>
+<magyx-cart-drawer data-preview="true" data-shipping-protection-icon-src="${shippingProtectionIcon}" data-gift-wrap-icon-src="${giftWrapIcon}"></magyx-cart-drawer>
 <script>${drawerJs}</script>
 </body>
 </html>`;
 }
 
 export default function CartEditor() {
-  const { cart, drawerCss, drawerJs, shippingProtectionIcon, previewProducts } = useLoaderData();
+  const { cart, drawerCss, drawerJs, shippingProtectionIcon, giftWrapIcon, previewProducts } = useLoaderData();
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher();
   const navigate = useNavigate();
@@ -364,8 +369,8 @@ export default function CartEditor() {
   }, [settings, previewOpen, postSettings]);
 
   const previewDoc = useMemo(
-    () => buildPreviewDoc(drawerCss, drawerJs, shippingProtectionIcon),
-    [drawerCss, drawerJs, shippingProtectionIcon],
+    () => buildPreviewDoc(drawerCss, drawerJs, shippingProtectionIcon, giftWrapIcon),
+    [drawerCss, drawerJs, shippingProtectionIcon, giftWrapIcon],
   );
 
   // The title badge reflects the last *saved* status, not the pending

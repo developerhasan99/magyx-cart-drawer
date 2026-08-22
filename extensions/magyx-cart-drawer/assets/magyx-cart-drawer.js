@@ -2108,13 +2108,17 @@
       );
 
       return `
-        <label class="bc-gift-wrap-row">
-          <span class="bc-gift-wrap-icon-wrap">${iconSvg("gift", "bc-gift-wrap-icon")}</span>
-          <span class="bc-gift-wrap-text">${escapeHtml(settings.giftWrapLabel)}</span>
-          <span class="bc-gift-wrap-price">+ ${this.formatMoney(settings.giftWrapPrice)}</span>
+        <label class="bc-gift-wrap-row ${isWrapped ? "is-enabled" : "is-disabled"}">
+          <span class="bc-gift-wrap-icon-wrap">
+            <img src="${escapeHtml(this.dataset.giftWrapIconSrc || "")}" alt="" width="36" height="36">
+          </span>
+          <span class="bc-gift-wrap-copy">
+            <span class="bc-gift-wrap-text">${escapeHtml(settings.giftWrapLabel)}</span>
+            <span class="bc-gift-wrap-price">+ ${this.formatMoney(settings.giftWrapPrice)}</span>
+          </span>
           <input
             type="checkbox"
-            class="bc-gift-wrap-checkbox"
+            class="bc-gift-wrap-toggle"
             data-magyx-action="toggle-gift-wrap"
             aria-label="${escapeHtml(settings.giftWrapLabel)}"
             ${isWrapped ? "checked" : ""}
@@ -2649,5 +2653,5 @@
 
   // Increment this after every storefront runtime edit so deployed assets can
   // be verified from the browser console.
-  console.log("[Magyx Cart] Edit version: 23");
+  console.log("[Magyx Cart] Edit version: 24");
 })();
